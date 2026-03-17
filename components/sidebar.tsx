@@ -27,7 +27,7 @@ export function Sidebar() {
     <aside className="flex flex-col w-16 bg-sidebar border-r border-sidebar-border h-full">
       {/* Logo */}
       <div className="flex items-center justify-center h-16 border-b border-sidebar-border">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
           <span className="text-primary-foreground font-bold text-sm">AL</span>
         </div>
       </div>

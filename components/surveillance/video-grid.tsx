@@ -38,12 +38,11 @@ export function VideoGrid({ detectionMode }: VideoGridProps) {
     <div className="space-y-8">
       {locations.map((location) => (
         <div key={location.id}>
-          <h2 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Location: {location.name}
+          <h2 className="text-base font-semibold text-foreground mb-4 flex items-center gap-2">
+            {location.name}
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {/* Video Thumbnails */}
             {location.videos.map((video) => (
               <VideoThumbnail
@@ -61,7 +60,8 @@ export function VideoGrid({ detectionMode }: VideoGridProps) {
             {[1, 2].map((placeholder) => (
               <button
                 key={`placeholder-${placeholder}`}
-                className="aspect-video rounded-lg border-2 border-dashed border-border bg-secondary/50 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-secondary transition-all cursor-pointer group"
+                className="rounded-lg border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-muted transition-all cursor-pointer group"
+                style={{ aspectRatio: '16/10' }}
               >
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                   <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />

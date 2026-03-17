@@ -32,31 +32,22 @@ export function VideoThumbnail({
   return (
     <Link 
       href={`/video/${id}`}
-      className="group relative aspect-video rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all"
+      className="group relative rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all"
+      style={{ aspectRatio: '16/10' }}
     >
       {/* Mock Video Feed Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900">
         {/* Simulated camera feed pattern */}
         <div className="absolute inset-0 opacity-30">
           <div className="w-full h-full bg-gradient-to-t from-black/60 to-transparent" />
         </div>
-        
-        {/* Grid pattern overlay */}
-        <div 
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px)`,
-            backgroundSize: '20px 20px'
-          }}
-        />
       </div>
 
       {/* Detection Bounding Boxes */}
       {detectionMode && boundingBoxes.map((box, index) => (
         <div
           key={index}
-          className="absolute border-2 border-primary rounded-sm"
+          className="absolute border-2 border-emerald-500 rounded-sm"
           style={{
             top: box.top,
             left: box.left,
@@ -64,7 +55,7 @@ export function VideoThumbnail({
             height: box.height,
           }}
         >
-          <span className="absolute -top-5 left-0 text-[10px] bg-primary text-primary-foreground px-1 rounded">
+          <span className="absolute -top-5 left-0 text-[10px] bg-emerald-500 text-white px-1 rounded">
             ID #{(index + 1) * thumbnailIndex}
           </span>
         </div>
@@ -72,8 +63,8 @@ export function VideoThumbnail({
 
       {/* Status Indicators */}
       <div className="absolute top-2 left-2 flex items-center gap-2">
-        <Wifi className="w-4 h-4 text-primary" />
-        <span className="text-[10px] text-white/70 bg-black/50 px-1.5 py-0.5 rounded">LIVE</span>
+        <Wifi className="w-4 h-4 text-emerald-500" />
+        <span className="text-[10px] text-white bg-black/50 px-1.5 py-0.5 rounded">LIVE</span>
       </div>
 
       {/* Pedestrian Count */}
@@ -93,7 +84,7 @@ export function VideoThumbnail({
       </div>
 
       {/* Hover Overlay */}
-      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
     </Link>
   )
 }
