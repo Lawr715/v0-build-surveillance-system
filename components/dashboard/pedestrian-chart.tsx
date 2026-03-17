@@ -75,7 +75,7 @@ const generateData = (timeRange: string) => {
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+      <div className="bg-popover border border-border rounded-2xl p-3 shadow-elevated">
         <p className="text-sm font-medium text-foreground mb-2">{label}</p>
         {payload.map((entry, index) => (
           <div key={index} className="flex items-center gap-2 text-sm">
@@ -97,7 +97,7 @@ export function PedestrianChart({ timeRange, selectedDate }: PedestrianChartProp
   const data = generateData(timeRange)
 
   return (
-    <div className="p-6 rounded-xl bg-card border border-border">
+    <div className="p-6 rounded-3xl bg-card border border-border shadow-elevated">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-base font-semibold text-foreground">Pedestrian Count Over Time</h3>

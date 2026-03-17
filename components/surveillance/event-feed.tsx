@@ -53,14 +53,14 @@ export function EventFeed({ filteredVideoId }: EventFeedProps) {
 
 function EventCard({ event }: { event: Event }) {
   return (
-    <div className="p-3 rounded-lg bg-muted/50 border border-border hover:bg-muted transition-all cursor-pointer">
+    <div className="p-3 rounded-2xl bg-secondary/50 border border-border hover:bg-secondary transition-all cursor-pointer">
       <div className="flex items-start gap-3">
         {/* Thumbnail placeholder */}
-        <div className="w-14 h-10 rounded bg-slate-700 flex items-center justify-center shrink-0">
+        <div className="w-14 h-10 rounded-xl bg-[#1C1C1E] flex items-center justify-center shrink-0">
           {event.type === "detection" ? (
-            <User className="w-4 h-4 text-white" />
+            <User className="w-4 h-4 text-accent" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-white" />
+            <AlertCircle className="w-4 h-4 text-chart-4" />
           )}
         </div>
         
@@ -69,8 +69,8 @@ function EventCard({ event }: { event: Event }) {
           <p className="text-xs text-muted-foreground">{event.description}</p>
           <p className="text-[10px] text-muted-foreground mt-1">{event.timestamp}</p>
           {event.pedestrianId && (
-            <span className="inline-flex items-center mt-1 text-[10px] text-foreground bg-muted px-1.5 py-0.5 rounded border border-border">
-              Pedestrian ID #{event.pedestrianId}
+            <span className="inline-flex items-center mt-1.5 text-[10px] text-accent font-medium bg-accent/10 px-2 py-0.5 rounded-full">
+              ID #{event.pedestrianId}
             </span>
           )}
         </div>

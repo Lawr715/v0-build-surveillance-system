@@ -106,12 +106,12 @@ export default function SurveillancePage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-card">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
           <h1 className="text-xl font-semibold text-foreground">Surveillance Overview</h1>
           
           <div className="flex items-center gap-3">
             {/* Date Filter */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary border border-border">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary border border-border">
               <Calendar className="w-4 h-4 text-muted-foreground" />
               <Input
                 type="date"
@@ -123,7 +123,7 @@ export default function SurveillancePage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5"
+                  className="h-5 w-5 hover:bg-muted rounded-full"
                   onClick={() => setSelectedDate("")}
                 >
                   <X className="w-3 h-3" />
@@ -132,20 +132,20 @@ export default function SurveillancePage() {
             </div>
 
             {/* Detection Mode Toggle */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary border border-border">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary border border-border">
               <ScanLine className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-foreground">Detection</span>
               <Switch
                 checked={detectionMode}
                 onCheckedChange={setDetectionMode}
-                className="data-[state=checked]:bg-primary"
+                className="data-[state=checked]:bg-accent"
               />
             </div>
 
             {/* Add Location Button */}
             <Button
               variant="outline"
-              className="border-border text-foreground hover:bg-secondary"
+              className="border-border text-foreground hover:bg-secondary rounded-2xl px-4"
               onClick={() => setLocationModalOpen(true)}
             >
               <MapPin className="w-4 h-4 mr-2" />
@@ -154,7 +154,7 @@ export default function SurveillancePage() {
 
             {/* Add Video Button */}
             <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl px-4 shadow-elevated-sm"
               onClick={() => setVideoModalOpen(true)}
             >
               <Video className="w-4 h-4 mr-2" />
@@ -165,11 +165,6 @@ export default function SurveillancePage() {
 
         {/* Video Grid */}
         <div className="flex-1 overflow-auto p-6">
-          {/* Location Map */}
-          <div className="mb-6">
-            <LocationMap locations={locations} />
-          </div>
-          
           {/* Video Grid */}
           {filteredLocations.length > 0 ? (
             <VideoGrid 
@@ -179,7 +174,9 @@ export default function SurveillancePage() {
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Video className="w-12 h-12 text-muted-foreground mb-4" />
+              <div className="w-16 h-16 rounded-3xl bg-secondary flex items-center justify-center mb-4">
+                <Video className="w-8 h-8 text-muted-foreground" />
+              </div>
               <h3 className="text-lg font-medium text-foreground mb-2">No videos found</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {selectedDate 
@@ -188,7 +185,7 @@ export default function SurveillancePage() {
                 }
               </p>
               {selectedDate && (
-                <Button variant="outline" onClick={() => setSelectedDate("")}>
+                <Button variant="outline" onClick={() => setSelectedDate("")} className="rounded-2xl">
                   Clear date filter
                 </Button>
               )}
@@ -198,8 +195,12 @@ export default function SurveillancePage() {
       </div>
 
       {/* Right Sidebar */}
-      <aside className="w-80 border-l border-border bg-card flex flex-col h-full">
+      <aside className="w-80 border-l border-border bg-card/30 flex flex-col h-full">
         <AISearchBar />
+        {/* Location Map - Below Search Bar */}
+        <div className="px-4 pb-4">
+          <LocationMap locations={locations} />
+        </div>
         <EventFeed />
       </aside>
 

@@ -3,81 +3,81 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ALIVE Engine - Clean Light Enterprise SaaS Theme */
+/* Bantay - Elevated Soft Dark Mode Theme */
 :root {
-  --background: #FFFFFF;
-  --foreground: #18181B;
-  --card: #FFFFFF;
-  --card-foreground: #18181B;
-  --popover: #FFFFFF;
-  --popover-foreground: #18181B;
-  --primary: #18181B;
+  --background: #1C1C1E;
+  --foreground: #F5F5F7;
+  --card: #2C2C2E;
+  --card-foreground: #F5F5F7;
+  --popover: #2C2C2E;
+  --popover-foreground: #F5F5F7;
+  --primary: #A855F7;
   --primary-foreground: #FFFFFF;
-  --secondary: #F4F4F5;
-  --secondary-foreground: #18181B;
-  --muted: #F4F4F5;
-  --muted-foreground: #71717A;
-  --accent: #F4F4F5;
-  --accent-foreground: #18181B;
-  --destructive: #EF4444;
-  --destructive-foreground: #FAFAFA;
-  --border: #E4E4E7;
-  --input: #E4E4E7;
-  --ring: #18181B;
-  --chart-1: #18181B;
-  --chart-2: #3B82F6;
+  --secondary: #3A3A3C;
+  --secondary-foreground: #F5F5F7;
+  --muted: #3A3A3C;
+  --muted-foreground: #98989D;
+  --accent: #22C55E;
+  --accent-foreground: #FFFFFF;
+  --destructive: #FF453A;
+  --destructive-foreground: #FFFFFF;
+  --border: #3A3A3C;
+  --input: #3A3A3C;
+  --ring: #A855F7;
+  --chart-1: #A855F7;
+  --chart-2: #06B6D4;
   --chart-3: #22C55E;
-  --chart-4: #F59E0B;
-  --chart-5: #EF4444;
-  --radius: 0.5rem;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #18181B;
-  --sidebar-primary: #18181B;
+  --chart-4: #FACC15;
+  --chart-5: #FF453A;
+  --radius: 1rem;
+  --sidebar: #1C1C1E;
+  --sidebar-foreground: #F5F5F7;
+  --sidebar-primary: #A855F7;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F4F4F5;
-  --sidebar-accent-foreground: #18181B;
-  --sidebar-border: #E4E4E7;
-  --sidebar-ring: #18181B;
+  --sidebar-accent: #2C2C2E;
+  --sidebar-accent-foreground: #F5F5F7;
+  --sidebar-border: #3A3A3C;
+  --sidebar-ring: #A855F7;
 }
 
 .dark {
-  --background: #FFFFFF;
-  --foreground: #18181B;
-  --card: #FFFFFF;
-  --card-foreground: #18181B;
-  --popover: #FFFFFF;
-  --popover-foreground: #18181B;
-  --primary: #18181B;
+  --background: #1C1C1E;
+  --foreground: #F5F5F7;
+  --card: #2C2C2E;
+  --card-foreground: #F5F5F7;
+  --popover: #2C2C2E;
+  --popover-foreground: #F5F5F7;
+  --primary: #A855F7;
   --primary-foreground: #FFFFFF;
-  --secondary: #F4F4F5;
-  --secondary-foreground: #18181B;
-  --muted: #F4F4F5;
-  --muted-foreground: #71717A;
-  --accent: #F4F4F5;
-  --accent-foreground: #18181B;
-  --destructive: #EF4444;
-  --destructive-foreground: #FAFAFA;
-  --border: #E4E4E7;
-  --input: #E4E4E7;
-  --ring: #18181B;
-  --chart-1: #18181B;
-  --chart-2: #3B82F6;
+  --secondary: #3A3A3C;
+  --secondary-foreground: #F5F5F7;
+  --muted: #3A3A3C;
+  --muted-foreground: #98989D;
+  --accent: #22C55E;
+  --accent-foreground: #FFFFFF;
+  --destructive: #FF453A;
+  --destructive-foreground: #FFFFFF;
+  --border: #3A3A3C;
+  --input: #3A3A3C;
+  --ring: #A855F7;
+  --chart-1: #A855F7;
+  --chart-2: #06B6D4;
   --chart-3: #22C55E;
-  --chart-4: #F59E0B;
-  --chart-5: #EF4444;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #18181B;
-  --sidebar-primary: #18181B;
+  --chart-4: #FACC15;
+  --chart-5: #FF453A;
+  --sidebar: #1C1C1E;
+  --sidebar-foreground: #F5F5F7;
+  --sidebar-primary: #A855F7;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F4F4F5;
-  --sidebar-accent-foreground: #18181B;
-  --sidebar-border: #E4E4E7;
-  --sidebar-ring: #18181B;
+  --sidebar-accent: #2C2C2E;
+  --sidebar-accent-foreground: #F5F5F7;
+  --sidebar-border: #3A3A3C;
+  --sidebar-ring: #A855F7;
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Roboto Mono', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -123,4 +123,13 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Soft shadow utilities for elevated cards */
+.shadow-elevated {
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+}
+
+.shadow-elevated-sm {
+  box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.3), 0 1px 4px -1px rgba(0, 0, 0, 0.2);
 }

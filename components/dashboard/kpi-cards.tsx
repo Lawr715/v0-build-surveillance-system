@@ -72,13 +72,13 @@ function KPICard({
   const colors = colorClasses[color] || colorClasses.primary
 
   return (
-    <div className="p-5 rounded-xl bg-card border border-border hover:border-primary/30 transition-all">
+    <div className="p-5 rounded-3xl bg-card border border-border hover:border-primary/30 transition-all shadow-elevated-sm">
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-2.5 rounded-lg ${colors.bg}`}>
+        <div className={`p-3 rounded-2xl ${colors.bg}`}>
           <Icon className={`w-5 h-5 ${colors.icon}`} />
         </div>
-        <div className={`flex items-center gap-1 text-xs font-medium ${
-          trend === "up" ? "text-primary" : "text-destructive"
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+          trend === "up" ? "text-accent bg-accent/10" : "text-destructive bg-destructive/10"
         }`}>
           {trend === "up" ? (
             <TrendingUp className="w-3 h-3" />

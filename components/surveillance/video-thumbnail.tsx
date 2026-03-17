@@ -32,7 +32,7 @@ export function VideoThumbnail({
   return (
     <Link 
       href={`/video/${id}`}
-      className="group relative rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all"
+      className="group relative rounded-2xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all shadow-elevated-sm"
       style={{ aspectRatio: '16/10' }}
     >
       {/* Mock Video Feed Background */}
@@ -62,25 +62,27 @@ export function VideoThumbnail({
       ))}
 
       {/* Status Indicators */}
-      <div className="absolute top-2 left-2 flex items-center gap-2">
-        <Wifi className="w-4 h-4 text-emerald-500" />
-        <span className="text-[10px] text-white bg-black/50 px-1.5 py-0.5 rounded">LIVE</span>
+      <div className="absolute top-3 left-3 flex items-center gap-2">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm">
+          <Wifi className="w-3 h-3 text-accent" />
+          <span className="text-[10px] text-white font-medium">LIVE</span>
+        </div>
       </div>
 
       {/* Pedestrian Count */}
-      <div className="absolute top-2 right-2 flex items-center gap-2">
-        <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
+      <div className="absolute top-3 right-3 flex items-center gap-2">
+        <span className="text-xs font-bold text-white bg-primary/80 backdrop-blur-sm px-2.5 py-1 rounded-full">
           {pedestrianCount}
         </span>
-        <button className="text-white/70 hover:text-white">
+        <button className="text-white/70 hover:text-white p-1 rounded-full bg-black/30 backdrop-blur-sm">
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
 
       {/* Bottom Info */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3">
-        <p className="text-sm font-medium text-white">{location}</p>
-        <p className="text-xs text-white/60">{date} • {timestamp}</p>
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4">
+        <p className="text-sm font-semibold text-white">{location}</p>
+        <p className="text-xs text-white/70">{date} - {timestamp}</p>
       </div>
 
       {/* Hover Overlay */}

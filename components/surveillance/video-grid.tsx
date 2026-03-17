@@ -56,10 +56,10 @@ export function VideoGrid({ locations, detectionMode, onAddVideoClick }: VideoGr
               <button
                 key={`placeholder-${location.id}-${placeholder}`}
                 onClick={onAddVideoClick}
-                className="rounded-lg border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-muted transition-all cursor-pointer group"
+                className="rounded-2xl border-2 border-dashed border-border bg-secondary/30 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-secondary/50 transition-all cursor-pointer group"
                 style={{ aspectRatio: '16/10' }}
               >
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                   <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
                 <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">

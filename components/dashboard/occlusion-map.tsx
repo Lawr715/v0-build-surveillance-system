@@ -65,7 +65,7 @@ export function OcclusionMap({ hourFilter, onHourFilterChange }: OcclusionMapPro
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-elevated">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-base font-semibold text-foreground">Occlusion Severity Map</h3>
@@ -74,39 +74,39 @@ export function OcclusionMap({ hourFilter, onHourFilterChange }: OcclusionMapPro
         
         {/* Hour Filter */}
         <Select value={hourFilter} onValueChange={onHourFilterChange}>
-          <SelectTrigger className="w-40 bg-secondary border-border text-foreground">
+          <SelectTrigger className="w-40 bg-secondary border-border text-foreground rounded-2xl">
             <Clock className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Hour" />
           </SelectTrigger>
-          <SelectContent className="bg-card border-border">
-            <SelectItem value="all" className="text-foreground">All Hours</SelectItem>
-            <SelectItem value="6" className="text-foreground">6:00 AM</SelectItem>
-            <SelectItem value="8" className="text-foreground">8:00 AM</SelectItem>
-            <SelectItem value="10" className="text-foreground">10:00 AM</SelectItem>
-            <SelectItem value="12" className="text-foreground">12:00 PM</SelectItem>
-            <SelectItem value="14" className="text-foreground">2:00 PM</SelectItem>
-            <SelectItem value="16" className="text-foreground">4:00 PM</SelectItem>
-            <SelectItem value="18" className="text-foreground">6:00 PM</SelectItem>
-            <SelectItem value="20" className="text-foreground">8:00 PM</SelectItem>
+          <SelectContent className="bg-popover border-border rounded-xl">
+            <SelectItem value="all" className="text-foreground rounded-lg">All Hours</SelectItem>
+            <SelectItem value="6" className="text-foreground rounded-lg">6:00 AM</SelectItem>
+            <SelectItem value="8" className="text-foreground rounded-lg">8:00 AM</SelectItem>
+            <SelectItem value="10" className="text-foreground rounded-lg">10:00 AM</SelectItem>
+            <SelectItem value="12" className="text-foreground rounded-lg">12:00 PM</SelectItem>
+            <SelectItem value="14" className="text-foreground rounded-lg">2:00 PM</SelectItem>
+            <SelectItem value="16" className="text-foreground rounded-lg">4:00 PM</SelectItem>
+            <SelectItem value="18" className="text-foreground rounded-lg">6:00 PM</SelectItem>
+            <SelectItem value="20" className="text-foreground rounded-lg">8:00 PM</SelectItem>
           </SelectContent>
         </Select>
       </div>
       
       {/* Map Visualization */}
-      <div className="relative h-64 bg-slate-900 rounded-lg overflow-hidden">
+      <div className="relative h-64 bg-[#1C1C1E] rounded-2xl overflow-hidden">
         {/* Grid lines */}
         <div className="absolute inset-0">
           {[0, 25, 50, 75, 100].map((percent) => (
             <div
               key={`h-${percent}`}
-              className="absolute w-full border-t border-slate-700/30"
+              className="absolute w-full border-t border-[#3A3A3C]/30"
               style={{ top: `${percent}%` }}
             />
           ))}
           {[0, 25, 50, 75, 100].map((percent) => (
             <div
               key={`v-${percent}`}
-              className="absolute h-full border-l border-slate-700/30"
+              className="absolute h-full border-l border-[#3A3A3C]/30"
               style={{ left: `${percent}%` }}
             />
           ))}
@@ -140,24 +140,24 @@ export function OcclusionMap({ hourFilter, onHourFilterChange }: OcclusionMapPro
               
               {/* Inner marker */}
               <div 
-                className="relative w-4 h-4 rounded-full border-2 border-white shadow-lg"
+                className="relative w-4 h-4 rounded-full border-2 border-white/80 shadow-lg"
                 style={{ backgroundColor: colors.bg }}
               >
                 <div className="absolute inset-0 rounded-full bg-white/30" />
               </div>
               
               {/* Tooltip */}
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl border border-slate-700 z-10">
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-elevated border border-border z-10">
                 <p className="font-medium">{location.name}</p>
-                <p className="text-slate-400 capitalize">Occlusion: {severity}</p>
+                <p className="text-muted-foreground capitalize">Occlusion: {severity}</p>
               </div>
             </div>
           )
         })}
         
         {/* Map label */}
-        <div className="absolute bottom-3 right-3 text-[10px] text-slate-400 bg-slate-800/80 px-2 py-1 rounded border border-slate-700">
-          <MapPin className="w-3 h-3 inline mr-1" />
+        <div className="absolute bottom-3 right-3 text-[10px] text-muted-foreground bg-secondary/80 px-2 py-1 rounded-lg border border-border flex items-center gap-1">
+          <MapPin className="w-3 h-3" />
           Surveillance Zone
         </div>
       </div>
@@ -166,15 +166,15 @@ export function OcclusionMap({ hourFilter, onHourFilterChange }: OcclusionMapPro
       <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-border">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-yellow-500" />
-          <span className="text-xs text-muted-foreground">Light Occlusion</span>
+          <span className="text-xs text-muted-foreground">Light</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-orange-500" />
-          <span className="text-xs text-muted-foreground">Moderate Occlusion</span>
+          <span className="text-xs text-muted-foreground">Moderate</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-xs text-muted-foreground">Heavy Occlusion</span>
+          <span className="text-xs text-muted-foreground">Heavy</span>
         </div>
       </div>
     </div>
