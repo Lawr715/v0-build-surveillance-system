@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { 
@@ -20,11 +21,17 @@ export function Sidebar() {
   return (
     <aside className="flex flex-col w-20 bg-sidebar border-r border-sidebar-border h-full relative">
       {/* Logo & Branding */}
-      <div className="flex flex-col items-center justify-center h-24 border-b border-sidebar-border gap-1">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-elevated-sm">
-          <span className="text-white font-bold text-sm">B</span>
+      <div className="flex flex-col items-center justify-center h-28 border-b border-sidebar-border gap-2 px-2">
+        <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-elevated-sm">
+          <Image 
+            src="/logo.jpg" 
+            alt="Bantay Logo" 
+            width={48} 
+            height={48}
+            className="w-full h-full object-cover"
+          />
         </div>
-        <span className="text-xs font-bold text-white tracking-wider">BANTAY</span>
+        <span className="text-[10px] font-extrabold text-white tracking-widest uppercase">BANTAY</span>
       </div>
 
       {/* Navigation */}

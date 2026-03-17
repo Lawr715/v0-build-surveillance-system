@@ -107,9 +107,9 @@ export default function SurveillancePage() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
-          <h1 className="text-xl font-semibold text-foreground">Surveillance Overview</h1>
+          <h1 className="text-xl font-semibold text-white shrink-0 mr-6">Surveillance Overview</h1>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap justify-end">
             {/* Date Filter */}
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary border border-border">
               <Calendar className="w-4 h-4 text-muted-foreground" />
