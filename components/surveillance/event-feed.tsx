@@ -1,80 +1,147 @@
 "use client"
 
-import { AlertCircle, User } from "lucide-react"
-
-interface Event {
-  id: string
-  type: "detection" | "alert" | "motion"
-  location: string
-  timestamp: string
-  description: string
-  pedestrianId?: number
-}
-
-const events: Event[] = [
-  { id: "1", type: "detection", location: "North Gate", timestamp: "10:45:32 AM", description: "3 pedestrians detected", pedestrianId: 45 },
-  { id: "2", type: "alert", location: "Main Hall", timestamp: "10:42:18 AM", description: "Unusual activity detected" },
-  { id: "3", type: "motion", location: "Parking Lot A", timestamp: "10:38:55 AM", description: "Vehicle movement detected" },
-  { id: "4", type: "detection", location: "North Gate", timestamp: "10:35:12 AM", description: "5 pedestrians detected", pedestrianId: 32 },
-  { id: "5", type: "detection", location: "Main Hall", timestamp: "10:30:44 AM", description: "2 pedestrians detected", pedestrianId: 18 },
-  { id: "6", type: "alert", location: "Parking Lot A", timestamp: "10:25:33 AM", description: "Perimeter breach alert" },
-  { id: "7", type: "detection", location: "North Gate", timestamp: "10:20:15 AM", description: "4 pedestrians detected", pedestrianId: 12 },
-  { id: "8", type: "motion", location: "Main Hall", timestamp: "10:15:28 AM", description: "Rapid movement detected" },
-]
+import { useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { AlertCircle, ArrowRight, Loader2, User } from "lucide-react"
+import type { EventRecord } from "@/lib/api"
 
 interface EventFeedProps {
   filteredVideoId?: string
+  events?: EventRecord[]
+  loading?: boolean
+  selectedEventId?: string
+  onEventSelect?: (event: EventRecord) => void
 }
 
-export function EventFeed({ filteredVideoId }: EventFeedProps) {
-  const displayEvents = filteredVideoId 
-    ? events.filter((_, i) => i % 2 === 0).slice(0, 5) 
-    : events
+export function EventFeed({ filteredVideoId, events = [], loading = false, selectedEventId, onEventSelect }: EventFeedProps) {
+  const router = useRouter()
+
+  const displayEvents = useMemo(() => {
+    if (filteredVideoId) {
+      return [...events].sort((left, right) => {
+        const leftOffset = typeof left.offsetSeconds === "number" ? left.offsetSeconds : Number.POSITIVE_INFINITY
+        const rightOffset = typeof right.offsetSeconds === "number" ? right.offsetSeconds : Number.POSITIVE_INFINITY
+        return leftOffset - rightOffset
+      })
+    }
+
+    return [...events].reverse()
+  }, [events, filteredVideoId])
+
+  const handleEventSelect = (event: EventRecord) => {
+    if (onEventSelect) {
+      onEventSelect(event)
+      return
+    }
+
+    if (!event.videoId) {
+      return
+    }
+
+    const params = new URLSearchParams({ eventId: event.id })
+    if (typeof event.offsetSeconds === "number") {
+      params.set("seek", String(event.offsetSeconds))
+    }
+
+    const query = params.toString()
+    router.push(query ? `/video/${event.videoId}?${query}` : `/video/${event.videoId}`)
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-border">
         <h3 className="text-sm font-medium text-foreground">Event Feed</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {filteredVideoId ? "Video-specific events" : "Real-time detections"}
+          {filteredVideoId ? "Click an event to seek within this recording" : "Open detections directly in the relevant footage"}
         </p>
       </div>
-      
+
       <div className="flex-1 overflow-auto">
-        <div className="p-2 space-y-2">
-          {displayEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center h-full p-6 text-muted-foreground">
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Loading events...
+          </div>
+        ) : displayEvents.length > 0 ? (
+          <div className="p-2 space-y-2">
+            {displayEvents.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                active={selectedEventId === event.id}
+                interactive={Boolean(onEventSelect || event.videoId)}
+                onSelect={() => handleEventSelect(event)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="p-6 text-sm text-muted-foreground">
+            No events available yet.
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function EventCard({ event }: { event: Event }) {
+function formatOffset(event: EventRecord) {
+  if (typeof event.offsetSeconds === "number") {
+    const minutes = Math.floor(event.offsetSeconds / 60)
+    const seconds = Math.floor(event.offsetSeconds % 60)
+    return `Jump to ${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+  if (typeof event.frame === "number") {
+    return `Frame ${event.frame}`
+  }
+
+  return "Open footage"
+}
+
+function EventCard({
+  event,
+  active,
+  interactive,
+  onSelect,
+}: {
+  event: EventRecord
+  active: boolean
+  interactive: boolean
+  onSelect: () => void
+}) {
+  const isDetection = event.type === "detection"
+
   return (
-    <div className="p-3 rounded-2xl bg-secondary/50 border border-border hover:bg-secondary transition-all cursor-pointer">
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={!interactive}
+      className={[
+        "w-full rounded-2xl border p-3 text-left transition-all",
+        active ? "border-primary bg-primary/10 shadow-elevated-sm" : "border-border bg-secondary/50 hover:border-primary/30 hover:bg-secondary",
+        interactive ? "cursor-pointer" : "cursor-default opacity-80",
+      ].join(" ")}
+    >
       <div className="flex items-start gap-3">
-        {/* Thumbnail placeholder */}
         <div className="w-14 h-10 rounded-xl bg-[#1C1C1E] flex items-center justify-center shrink-0">
-          {event.type === "detection" ? (
-            <User className="w-4 h-4 text-accent" />
-          ) : (
-            <AlertCircle className="w-4 h-4 text-chart-4" />
-          )}
+          {isDetection ? <User className="w-4 h-4 text-accent" /> : <AlertCircle className="w-4 h-4 text-chart-4" />}
         </div>
-        
+
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{event.location}</p>
-          <p className="text-xs text-muted-foreground">{event.description}</p>
-          <p className="text-[10px] text-muted-foreground mt-1">{event.timestamp}</p>
-          {event.pedestrianId && (
-            <span className="inline-flex items-center mt-1.5 text-[10px] text-accent font-medium bg-accent/10 px-2 py-0.5 rounded-full">
-              ID #{event.pedestrianId}
-            </span>
-          )}
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium text-foreground truncate">{event.location}</p>
+            {interactive && <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">{event.description}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{event.timestamp}</span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{formatOffset(event)}</span>
+            {typeof event.pedestrianId === "number" && (
+              <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">ID #{event.pedestrianId}</span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </button>
   )
 }

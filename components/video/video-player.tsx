@@ -1,175 +1,111 @@
 "use client"
 
-import { useState } from "react"
-import { Play, Pause, Volume2, Maximize, SkipBack, SkipForward, Settings } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
+import { useEffect, useRef } from "react"
+import { AlertCircle, MapPin, Users } from "lucide-react"
 
 interface VideoPlayerProps {
   videoId: string
   location: string
+  src?: string | null
+  pedestrianCount: number
+  timestamp: string
+  date: string
+  isProcessed: boolean
+  videoRef?: { current: HTMLVideoElement | null }
+  requestedSeek?: { seconds: number; token: number } | null
+  onTimeUpdate?: (seconds: number) => void
+  onDurationChange?: (seconds: number) => void
 }
 
-// Mock bounding boxes for ByteTrack simulation
-const boundingBoxes = [
-  { id: 45, top: "25%", left: "15%", width: "8%", height: "35%", confidence: 0.95 },
-  { id: 32, top: "30%", left: "35%", width: "9%", height: "38%", confidence: 0.89 },
-  { id: 18, top: "28%", left: "55%", width: "7%", height: "32%", confidence: 0.92 },
-  { id: 67, top: "32%", left: "72%", width: "8%", height: "36%", confidence: 0.87 },
-  { id: 23, top: "35%", left: "88%", width: "7%", height: "30%", confidence: 0.91 },
-]
+function applySeek(video: HTMLVideoElement, seconds: number) {
+  const nextTime = Number.isFinite(video.duration) ? Math.min(Math.max(seconds, 0), video.duration) : Math.max(seconds, 0)
+  video.currentTime = nextTime
+}
 
-export function VideoPlayer({ videoId, location }: VideoPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(35)
-  const [volume, setVolume] = useState([75])
+export function VideoPlayer({
+  videoId,
+  location,
+  src,
+  pedestrianCount,
+  timestamp,
+  date,
+  isProcessed,
+  videoRef,
+  requestedSeek,
+  onTimeUpdate,
+  onDurationChange,
+}: VideoPlayerProps) {
+  const fallbackRef = useRef<HTMLVideoElement | null>(null)
+  const resolvedRef = videoRef ?? fallbackRef
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+  useEffect(() => {
+    if (!src) {
+      onDurationChange?.(0)
+      onTimeUpdate?.(0)
+    }
+  }, [onDurationChange, onTimeUpdate, src])
+
+  useEffect(() => {
+    if (!requestedSeek || !resolvedRef.current) {
+      return
+    }
+
+    const video = resolvedRef.current
+    const seekToRequestedTime = () => applySeek(video, requestedSeek.seconds)
+
+    if (video.readyState >= 1) {
+      seekToRequestedTime()
+      return
+    }
+
+    video.addEventListener("loadedmetadata", seekToRequestedTime, { once: true })
+    return () => video.removeEventListener("loadedmetadata", seekToRequestedTime)
+  }, [requestedSeek, resolvedRef, src])
 
   return (
-    <div className="relative aspect-video bg-secondary rounded-xl overflow-hidden border border-border">
-      {/* Video Background Simulation */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
-        {/* Simulated camera feed with grid */}
-        <div 
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px)`,
-            backgroundSize: '30px 30px'
-          }}
-        />
-        
-        {/* Noise texture */}
-        <div className="absolute inset-0 opacity-5 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')]" />
-      </div>
-
-      {/* ByteTrack Bounding Boxes */}
-      {boundingBoxes.map((box) => (
-        <div
-          key={box.id}
-          className="absolute border-2 border-primary rounded-sm transition-all duration-300"
-          style={{
-            top: box.top,
-            left: box.left,
-            width: box.width,
-            height: box.height,
-          }}
-        >
-          {/* ID Label */}
-          <div className="absolute -top-6 left-0 flex items-center gap-1">
-            <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-medium">
-              ID #{box.id}
-            </span>
-            <span className="text-[10px] bg-accent text-accent-foreground px-1 py-0.5 rounded">
-              {(box.confidence * 100).toFixed(0)}%
-            </span>
-          </div>
-          
-          {/* Tracking indicator */}
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-elevated-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className={`rounded-full px-2.5 py-1 font-medium ${isProcessed ? "bg-primary/15 text-primary" : src ? "bg-accent/15 text-accent" : "bg-muted text-muted-foreground"}`}>
+            {isProcessed ? "Annotated output" : src ? "Original upload" : "No media"}
+          </span>
+          <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Feed #{videoId}</span>
         </div>
-      ))}
-
-      {/* Overlay Info */}
-      <div className="absolute top-4 left-4 flex items-center gap-3">
-        <span className="flex items-center gap-1.5 text-xs text-white bg-black/60 px-2 py-1 rounded">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          REC
-        </span>
-        <span className="text-xs text-white bg-black/60 px-2 py-1 rounded">
-          {location}
-        </span>
-        <span className="text-xs text-white bg-black/60 px-2 py-1 rounded">
-          Feed #{videoId}
+        <span className="text-xs text-muted-foreground">
+          {date} • {timestamp}
         </span>
       </div>
 
-      {/* Detection Count */}
-      <div className="absolute top-4 right-4">
-        <span className="text-sm font-medium text-white bg-primary/90 px-3 py-1.5 rounded-lg">
-          {boundingBoxes.length} Detected
-        </span>
-      </div>
-
-      {/* Timestamp */}
-      <div className="absolute bottom-16 right-4 text-white/80 text-xs bg-black/50 px-2 py-1 rounded">
-        2024-03-15 • 10:45:32 AM
-      </div>
-
-      {/* Video Controls */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4">
-        {/* Progress Bar */}
-        <div className="mb-3">
-          <Slider
-            value={[currentTime]}
-            max={100}
-            step={1}
-            onValueChange={(value) => setCurrentTime(value[0])}
-            className="cursor-pointer"
+      {src ? (
+        <div className="bg-black">
+          <video
+            key={src}
+            ref={resolvedRef}
+            src={src}
+            controls
+            playsInline
+            preload="metadata"
+            className="aspect-video w-full bg-black"
+            onLoadedMetadata={(event) => onDurationChange?.(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
+            onTimeUpdate={(event) => onTimeUpdate?.(event.currentTarget.currentTime)}
           />
         </div>
-
-        {/* Controls Row */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="text-white hover:bg-white/20"
-              onClick={() => setCurrentTime(Math.max(0, currentTime - 10))}
-            >
-              <SkipBack className="w-4 h-4" />
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="text-white hover:bg-white/20 w-10 h-10"
-              onClick={() => setIsPlaying(!isPlaying)}
-            >
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="text-white hover:bg-white/20"
-              onClick={() => setCurrentTime(Math.min(100, currentTime + 10))}
-            >
-              <SkipForward className="w-4 h-4" />
-            </Button>
-
-            <span className="text-white text-sm ml-2">
-              {formatTime(Math.floor(currentTime * 0.6))} / 01:00:00
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 w-28">
-              <Volume2 className="w-4 h-4 text-white" />
-              <Slider
-                value={volume}
-                max={100}
-                step={1}
-                onValueChange={setVolume}
-                className="cursor-pointer"
-              />
-            </div>
-            
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
-              <Settings className="w-4 h-4" />
-            </Button>
-            
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
-              <Maximize className="w-4 h-4" />
-            </Button>
-          </div>
+      ) : (
+        <div className="flex aspect-video items-center justify-center gap-3 bg-secondary px-6 text-center text-muted-foreground">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <p className="text-sm">No uploaded media is available for this video yet.</p>
         </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1">
+          <MapPin className="h-3.5 w-3.5" />
+          {location}
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1">
+          <Users className="h-3.5 w-3.5" />
+          {pedestrianCount} pedestrians
+        </span>
       </div>
     </div>
   )

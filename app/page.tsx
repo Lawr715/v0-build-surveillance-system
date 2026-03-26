@@ -1,105 +1,227 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { VideoGrid } from "@/components/surveillance/video-grid"
 import { EventFeed } from "@/components/surveillance/event-feed"
 import { AISearchBar } from "@/components/surveillance/ai-search-bar"
 import { AddLocationModal } from "@/components/surveillance/add-location-modal"
 import { AddVideoModal } from "@/components/surveillance/add-video-modal"
 import { LocationMap } from "@/components/surveillance/location-map"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
-import { Input } from "@/components/ui/input"
-import { MapPin, Video, ScanLine, Calendar, X } from "lucide-react"
-
-// Mock data for locations with coordinates
-const initialLocations = [
-  {
-    id: "north-gate",
-    name: "North Gate",
-    latitude: 14.5547,
-    longitude: 121.0244,
-    videos: [
-      { id: "1", timestamp: "10:45:32 AM", date: "2026-03-15", startTime: "10:00", endTime: "11:00" },
-      { id: "2", timestamp: "10:42:18 AM", date: "2026-03-13", startTime: "10:00", endTime: "11:00" },
-    ]
-  },
-  {
-    id: "main-hall",
-    name: "Main Hall",
-    latitude: 14.5565,
-    longitude: 121.0220,
-    videos: [
-      { id: "3", timestamp: "10:38:55 AM", date: "2026-03-15", startTime: "10:00", endTime: "11:00" },
-    ]
-  },
-  {
-    id: "parking-a",
-    name: "Parking Lot A",
-    latitude: 14.5530,
-    longitude: 121.0260,
-    videos: [
-      { id: "4", timestamp: "10:30:12 AM", date: "2026-03-13", startTime: "10:00", endTime: "11:00" },
-      { id: "5", timestamp: "10:25:44 AM", date: "2026-03-15", startTime: "10:00", endTime: "11:00" },
-    ]
-  }
-]
+import { FootageDatePicker } from "@/components/ui/footage-date-picker"
+import { AlertCircle, Calendar, ChevronDown, Loader2, MapPin, Pencil, Plus, ScanLine, Trash2, Video } from "lucide-react"
+import {
+  createLocation,
+  deleteLocation,
+  getEvents,
+  getLocations,
+  type EventRecord,
+  type LocationRecord,
+  type VideoUploadStatus,
+  updateLocation,
+  uploadVideo,
+} from "@/lib/api"
 
 export default function SurveillancePage() {
   const [detectionMode, setDetectionMode] = useState(true)
+  const [locationMenuOpen, setLocationMenuOpen] = useState(false)
   const [locationModalOpen, setLocationModalOpen] = useState(false)
+  const [editingLocation, setEditingLocation] = useState<LocationRecord | null>(null)
+  const [pendingDeleteLocation, setPendingDeleteLocation] = useState<LocationRecord | null>(null)
+  const [isDeletingLocation, setIsDeletingLocation] = useState(false)
   const [videoModalOpen, setVideoModalOpen] = useState(false)
+  const [selectedUploadLocationId, setSelectedUploadLocationId] = useState("")
   const [selectedDate, setSelectedDate] = useState("")
-  const [locations, setLocations] = useState(initialLocations)
+  const [locations, setLocations] = useState<LocationRecord[]>([])
+  const [events, setEvents] = useState<EventRecord[]>([])
+  const [locationsLoading, setLocationsLoading] = useState(true)
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [pageError, setPageError] = useState<string | null>(null)
+  const [locationsError, setLocationsError] = useState<string | null>(null)
+  const [eventsError, setEventsError] = useState<string | null>(null)
 
-  // Filter videos by selected date
+  const loadLocations = useCallback(async () => {
+    setLocationsLoading(true)
+    try {
+      const response = await getLocations()
+      setLocations(response)
+      setLocationsError(null)
+    } catch (error) {
+      setLocationsError(error instanceof Error ? error.message : "Failed to load locations.")
+    } finally {
+      setLocationsLoading(false)
+    }
+  }, [])
+
+  const loadEvents = useCallback(async () => {
+    setEventsLoading(true)
+    try {
+      const response = await getEvents()
+      setEvents(response)
+      setEventsError(null)
+    } catch (error) {
+      setEventsError(error instanceof Error ? error.message : "Failed to load events.")
+    } finally {
+      setEventsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadLocations()
+  }, [loadLocations])
+
+  useEffect(() => {
+    void loadEvents()
+  }, [loadEvents])
+
   const filteredLocations = useMemo(() => {
     if (!selectedDate) return locations
-    
-    return locations.map(location => ({
+
+    return locations.map((location) => ({
       ...location,
-      videos: location.videos.filter(video => video.date === selectedDate)
-    })).filter(location => location.videos.length > 0)
+      videos: location.videos.filter((video) => video.date === selectedDate),
+    }))
   }, [locations, selectedDate])
 
-  const handleAddLocation = (data: {
+  const hasAnyVideosForSelectedDate = useMemo(
+    () => filteredLocations.some((location) => location.videos.length > 0),
+    [filteredLocations],
+  )
+  const footageDates = useMemo(
+    () => Array.from(new Set(locations.flatMap((location) => location.videos.map((video) => video.date)))).sort(),
+    [locations],
+  )
+
+  const handleVideoModalChange = (open: boolean) => {
+    setVideoModalOpen(open)
+    if (!open) {
+      setSelectedUploadLocationId("")
+    }
+  }
+
+  const handleLocationModalChange = (open: boolean) => {
+    setLocationModalOpen(open)
+    if (!open) {
+      setEditingLocation(null)
+    }
+  }
+
+  const handleOpenAddVideo = (locationId?: string) => {
+    setSelectedUploadLocationId(locationId ?? "")
+    setVideoModalOpen(true)
+  }
+
+  const handleOpenAddLocation = () => {
+    setLocationMenuOpen(false)
+    setTimeout(() => {
+      setEditingLocation(null)
+      setLocationModalOpen(true)
+    }, 0)
+  }
+
+  const handleOpenEditLocation = (location: LocationRecord) => {
+    setLocationMenuOpen(false)
+    setTimeout(() => {
+      setEditingLocation(location)
+      setLocationModalOpen(true)
+    }, 0)
+  }
+
+  const handleOpenDeleteLocation = (location: LocationRecord) => {
+    setLocationMenuOpen(false)
+    setTimeout(() => {
+      setPendingDeleteLocation(location)
+    }, 0)
+  }
+
+  const handleSaveLocation = async (data: {
     name: string
     latitude: number
     longitude: number
     description: string
     address: string
   }) => {
-    const newLocation = {
-      id: data.name.toLowerCase().replace(/\s+/g, '-'),
-      name: data.name,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      videos: []
+    try {
+      setPageError(null)
+      if (editingLocation) {
+        await updateLocation(editingLocation.id, data)
+      } else {
+        await createLocation(data)
+      }
+      await Promise.all([loadLocations(), loadEvents()])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : editingLocation ? "Failed to update location." : "Failed to create location."
+      setPageError(message)
+      throw error
     }
-    setLocations(prev => [...prev, newLocation])
   }
 
-  const handleAddVideo = (data: {
+  const handleDeleteSelectedLocation = async () => {
+    if (!pendingDeleteLocation || isDeletingLocation) return
+
+    try {
+      setIsDeletingLocation(true)
+      setPageError(null)
+      await deleteLocation(pendingDeleteLocation.id)
+      if (selectedUploadLocationId === pendingDeleteLocation.id) {
+        setSelectedUploadLocationId("")
+      }
+      if (editingLocation?.id === pendingDeleteLocation.id) {
+        setEditingLocation(null)
+        setLocationModalOpen(false)
+      }
+      setPendingDeleteLocation(null)
+      await Promise.all([loadLocations(), loadEvents()])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete location."
+      setPageError(message)
+    } finally {
+      setIsDeletingLocation(false)
+    }
+  }
+
+  const handleAddVideo = async (data: {
     file: File
     locationId: string
     date: string
     startTime: string
     endTime: string
+    fastMode: boolean
+    onProgress?: (status: VideoUploadStatus) => void
   }) => {
-    const newVideo = {
-      id: `video-${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString(),
-      date: data.date,
-      startTime: data.startTime,
-      endTime: data.endTime,
+    try {
+      setPageError(null)
+      await uploadVideo(data)
+      await Promise.all([loadLocations(), loadEvents()])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to upload video."
+      setPageError(message)
+      throw error
     }
-    
-    setLocations(prev => prev.map(loc => 
-      loc.id === data.locationId 
-        ? { ...loc, videos: [...loc.videos, newVideo] }
-        : loc
-    ))
   }
+
+  const activeError = pageError ?? locationsError ?? eventsError
 
   return (
     <div className="flex h-full">
@@ -111,25 +233,12 @@ export default function SurveillancePage() {
           
           <div className="flex items-center gap-3 flex-wrap justify-end">
             {/* Date Filter */}
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary border border-border">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="border-0 bg-transparent p-0 h-auto text-sm w-36 focus-visible:ring-0"
-              />
-              {selectedDate && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 hover:bg-muted rounded-full"
-                  onClick={() => setSelectedDate("")}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
+            <FootageDatePicker
+              value={selectedDate}
+              onChange={setSelectedDate}
+              highlightedDates={footageDates}
+              allowClear
+            />
 
             {/* Detection Mode Toggle */}
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary border border-border">
@@ -142,20 +251,66 @@ export default function SurveillancePage() {
               />
             </div>
 
-            {/* Add Location Button */}
-            <Button
-              variant="outline"
-              className="border-border text-foreground hover:bg-secondary rounded-2xl px-4"
-              onClick={() => setLocationModalOpen(true)}
-            >
-              <MapPin className="w-4 h-4 mr-2" />
-              Add Location
-            </Button>
+            <DropdownMenu open={locationMenuOpen} onOpenChange={setLocationMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border-border text-foreground hover:bg-secondary rounded-2xl px-4">
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Location
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onSelect={handleOpenAddLocation}>
+                  <Plus className="h-4 w-4" />
+                  Add Location
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={locations.length === 0}>
+                    <Pencil className="h-4 w-4" />
+                    Edit Location
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {locations.length > 0 ? (
+                      locations.map((location) => (
+                        <DropdownMenuItem key={`edit-${location.id}`} onSelect={() => handleOpenEditLocation(location)}>
+                          {location.name}
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <DropdownMenuItem disabled>No locations available</DropdownMenuItem>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={locations.length === 0}>
+                    <Trash2 className="h-4 w-4" />
+                    Delete Location
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {locations.length > 0 ? (
+                      locations.map((location) => (
+                        <DropdownMenuItem
+                          key={`delete-${location.id}`}
+                          variant="destructive"
+                          onSelect={() => handleOpenDeleteLocation(location)}
+                        >
+                          {location.name}
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <DropdownMenuItem disabled>No locations available</DropdownMenuItem>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Add Video Button */}
             <Button
               className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl px-4 shadow-elevated-sm"
-              onClick={() => setVideoModalOpen(true)}
+              onClick={() => handleOpenAddVideo()}
             >
               <Video className="w-4 h-4 mr-2" />
               Add Video
@@ -165,12 +320,33 @@ export default function SurveillancePage() {
 
         {/* Video Grid */}
         <div className="flex-1 overflow-auto p-6">
-          {/* Video Grid */}
-          {filteredLocations.length > 0 ? (
-            <VideoGrid 
-              locations={filteredLocations} 
-              detectionMode={detectionMode} 
-              onAddVideoClick={() => setVideoModalOpen(true)}
+          {activeError && (
+            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{activeError}</span>
+            </div>
+          )}
+
+          {selectedDate && !hasAnyVideosForSelectedDate && filteredLocations.length > 0 && (
+            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
+              <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div>
+                <p className="font-medium">No footage is scheduled for this date yet.</p>
+                <p className="mt-1 text-muted-foreground">You can still use any placeholder card below to upload a new recording directly into the correct location.</p>
+              </div>
+            </div>
+          )}
+
+          {locationsLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+              <Loader2 className="mb-4 h-8 w-8 animate-spin" />
+              <p className="text-sm">Loading locations and videos...</p>
+            </div>
+          ) : filteredLocations.length > 0 ? (
+            <VideoGrid
+              locations={filteredLocations}
+              detectionMode={detectionMode}
+              onAddVideoClick={handleOpenAddVideo}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -199,23 +375,49 @@ export default function SurveillancePage() {
         <AISearchBar />
         {/* Location Map - Below Search Bar */}
         <div className="px-4 pb-4">
-          <LocationMap locations={locations} />
+          <LocationMap locations={filteredLocations} />
         </div>
-        <EventFeed />
+        <EventFeed events={events} loading={eventsLoading} />
       </aside>
 
       {/* Modals */}
       <AddLocationModal 
         open={locationModalOpen} 
-        onOpenChange={setLocationModalOpen}
-        onAddLocation={handleAddLocation}
+        onOpenChange={handleLocationModalChange}
+        initialData={editingLocation}
+        onSubmitLocation={handleSaveLocation}
       />
       <AddVideoModal 
-        open={videoModalOpen} 
-        onOpenChange={setVideoModalOpen}
-        locations={locations.map(l => ({ id: l.id, name: l.name }))}
+        open={videoModalOpen}
+        onOpenChange={handleVideoModalChange}
+        locations={locations.map((location) => ({ id: location.id, name: location.name }))}
+        initialLocationId={selectedUploadLocationId}
         onAddVideo={handleAddVideo}
       />
+      <AlertDialog open={Boolean(pendingDeleteLocation)} onOpenChange={(open) => !open && setPendingDeleteLocation(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {pendingDeleteLocation?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the location, all linked footage, generated processed videos, and related detection events.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingLocation}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingLocation}
+              onClick={(event) => {
+                event.preventDefault()
+                void handleDeleteSelectedLocation()
+              }}
+            >
+              {isDeletingLocation ? "Deleting..." : "Delete Location"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

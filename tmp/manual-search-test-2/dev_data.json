@@ -1,0 +1,43 @@
+{
+  "model": {
+    "currentModel": "yolov8n-bytetrack.pt",
+    "uploadedAt": null
+  },
+  "locations": [
+    {
+      "id": "edsa-sec-walk",
+      "name": "EDSA Sec Walk",
+      "latitude": 14.6397,
+      "longitude": 121.0775,
+      "description": "Approximate Xavier Hall camera anchor along the EDSA security walkway.",
+      "address": "Ateneo de Manila University \u00b7 Xavier Hall"
+    },
+    {
+      "id": "kostka-walk",
+      "name": "Kostka Walk",
+      "latitude": 14.639,
+      "longitude": 121.0781,
+      "description": "Approximate Kostka Hall pedestrian corridor camera anchor.",
+      "address": "Ateneo de Manila University \u00b7 Kostka Hall"
+    },
+    {
+      "id": "gate-1-walkway",
+      "name": "Gate 1 Walkway",
+      "latitude": 14.6418,
+      "longitude": 121.0758,
+      "description": "Approximate Gate 1 walkway camera anchor.",
+      "address": "Ateneo de Manila University \u00b7 Gate 1"
+    },
+    {
+      "id": "gate-3-walkway",
+      "name": "Gate 3 Walkway",
+      "latitude": 14.6376,
+      "longitude": 121.0742,
+      "description": "Approximate Gate 3 walkway camera anchor.",
+      "address": "Ateneo de Manila University \u00b7 Gate 3"
+    }
+  ],
+  "videos": [],
+  "events": [],
+  "pedestrianTracks": []
+}

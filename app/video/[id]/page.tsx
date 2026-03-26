@@ -1,35 +1,202 @@
 "use client"
 
-import { use } from "react"
+import { Suspense, use, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { VideoPlayer } from "@/components/video/video-player"
 import { VideoMetadata } from "@/components/video/video-metadata"
 import { PlaybackTimeline } from "@/components/video/playback-timeline"
 import { EventFeed } from "@/components/surveillance/event-feed"
 import { AISearchBar } from "@/components/surveillance/ai-search-bar"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Download, Share2 } from "lucide-react"
+import { AlertCircle, ArrowLeft, Download, Loader2, Share2, Trash2 } from "lucide-react"
+import { deleteVideo, getEvents, getMediaUrl, getVideo, getVideoPlaybackPath, type EventRecord, type VideoRecord } from "@/lib/api"
 
-// Mock video data
-const videoData: Record<string, {
-  location: string
-  date: string
-  startTime: string
-  endTime: string
-  gpsLat: number
-  gpsLng: number
-  pedestrianCount: number
-}> = {
-  "1": { location: "North Gate", date: "2024-03-15", startTime: "10:00:00", endTime: "11:00:00", gpsLat: 40.7128, gpsLng: -74.0060, pedestrianCount: 156 },
-  "2": { location: "North Gate", date: "2024-03-15", startTime: "09:00:00", endTime: "10:00:00", gpsLat: 40.7128, gpsLng: -74.0060, pedestrianCount: 89 },
-  "3": { location: "Main Hall", date: "2024-03-15", startTime: "10:00:00", endTime: "11:00:00", gpsLat: 40.7589, gpsLng: -73.9851, pedestrianCount: 234 },
-  "4": { location: "Parking Lot A", date: "2024-03-15", startTime: "10:00:00", endTime: "11:00:00", gpsLat: 40.7484, gpsLng: -73.9857, pedestrianCount: 45 },
-  "5": { location: "Parking Lot A", date: "2024-03-15", startTime: "09:00:00", endTime: "10:00:00", gpsLat: 40.7484, gpsLng: -73.9857, pedestrianCount: 67 },
+function getDetectionStatus(event: EventRecord) {
+  if (event.type === "alert") return "Requires Review"
+  if (event.type === "motion") return "Motion Event"
+  return "Tracked"
 }
 
-export default function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function VideoDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const video = videoData[id] || videoData["1"]
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [video, setVideo] = useState<VideoRecord | null>(null)
+  const [events, setEvents] = useState<EventRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | undefined>(undefined)
+  const [requestedSeek, setRequestedSeek] = useState<{ seconds: number; token: number } | null>(null)
+  const [currentTimeSeconds, setCurrentTimeSeconds] = useState(0)
+  const [durationSeconds, setDurationSeconds] = useState(0)
+  const [showAllDetections, setShowAllDetections] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const videoElementRef = useRef<HTMLVideoElement | null>(null)
+  const seekTokenRef = useRef(0)
+  const appliedQuerySeekRef = useRef("")
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadVideo = async () => {
+      setLoading(true)
+      try {
+        const [videoResponse, eventsResponse] = await Promise.all([getVideo(id), getEvents(id)])
+
+        if (!cancelled) {
+          setVideo(videoResponse)
+          setEvents(eventsResponse)
+          setError(null)
+          setActionError(null)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setError(error instanceof Error ? error.message : "Failed to load video details.")
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadVideo()
+
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  useEffect(() => {
+    setShowAllDetections(false)
+    setCurrentTimeSeconds(0)
+    setDurationSeconds(0)
+  }, [id])
+
+  useEffect(() => {
+    const eventId = searchParams.get("eventId") ?? undefined
+    setSelectedEventId(eventId)
+
+    const seekValue = searchParams.get("seek")
+    const seekKey = `${id}:${eventId ?? ""}:${seekValue ?? ""}`
+
+    if (!seekValue || appliedQuerySeekRef.current === seekKey) {
+      return
+    }
+
+    const seconds = Number(seekValue)
+    if (!Number.isFinite(seconds)) {
+      return
+    }
+
+    appliedQuerySeekRef.current = seekKey
+    seekTokenRef.current += 1
+    setRequestedSeek({ seconds, token: seekTokenRef.current })
+  }, [id, searchParams])
+
+  const orderedEvents = useMemo(
+    () =>
+      [...events].sort((left, right) => {
+        const leftOffset = typeof left.offsetSeconds === "number" ? left.offsetSeconds : Number.POSITIVE_INFINITY
+        const rightOffset = typeof right.offsetSeconds === "number" ? right.offsetSeconds : Number.POSITIVE_INFINITY
+        return leftOffset - rightOffset
+      }),
+    [events],
+  )
+
+  const detectionDetails = useMemo(() => {
+    const seen = new Set<number>()
+
+    return orderedEvents
+      .filter((event): event is EventRecord & { pedestrianId: number } => typeof event.pedestrianId === "number")
+      .filter((event) => {
+        if (seen.has(event.pedestrianId)) return false
+        seen.add(event.pedestrianId)
+        return true
+      })
+      .map((event) => ({ id: event.pedestrianId, status: getDetectionStatus(event) }))
+  }, [orderedEvents])
+
+  const visibleDetectionDetails = showAllDetections ? detectionDetails : detectionDetails.slice(0, 15)
+  const hasCollapsedDetections = detectionDetails.length > 15
+
+  const mediaUrl = video ? getMediaUrl(getVideoPlaybackPath(video)) : null
+
+  const requestSeek = (seconds: number) => {
+    seekTokenRef.current += 1
+    setRequestedSeek({ seconds, token: seekTokenRef.current })
+  }
+
+  const handleEventSelect = (event: EventRecord) => {
+    setSelectedEventId(event.id)
+    setActionError(null)
+
+    if (typeof event.offsetSeconds === "number") {
+      requestSeek(event.offsetSeconds)
+    }
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("eventId", event.id)
+    if (typeof event.offsetSeconds === "number") {
+      params.set("seek", String(event.offsetSeconds))
+    } else {
+      params.delete("seek")
+    }
+
+    const query = params.toString()
+    router.replace(query ? `/video/${id}?${query}` : `/video/${id}`, { scroll: false })
+  }
+
+  const handleDelete = async () => {
+    if (deleting || !video) return
+
+    const confirmed = typeof window === "undefined"
+      ? false
+      : window.confirm(`Delete the recording for ${video.location} on ${video.date}? This also removes the saved media files.`)
+
+    if (!confirmed) return
+
+    setDeleting(true)
+    setActionError(null)
+
+    try {
+      await deleteVideo(video.id)
+      router.push("/")
+      router.refresh()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to delete this video.")
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+        Loading video details...
+      </div>
+    )
+  }
+
+  if (error || !video) {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="max-w-md rounded-3xl border border-destructive/30 bg-card p-6 text-center shadow-elevated-sm">
+          <AlertCircle className="mx-auto mb-4 h-10 w-10 text-destructive" />
+          <h1 className="text-xl font-semibold text-foreground">Unable to load this video</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{error ?? "The requested video could not be found."}</p>
+          <Link href="/" className="mt-4 inline-block">
+            <Button variant="outline" className="border-border text-foreground hover:bg-secondary">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to overview
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full">
@@ -50,27 +217,76 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="border-border text-foreground hover:bg-secondary">
+            <Button
+              variant="destructive"
+              className="rounded-2xl"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete
+            </Button>
+            <Button
+              variant="outline"
+              className="border-border text-foreground hover:bg-secondary rounded-2xl"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  void navigator.clipboard.writeText(window.location.href)
+                }
+              }}
+            >
               <Share2 className="w-4 h-4 mr-2" />
-              Share
+              Copy Link
             </Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
+            {mediaUrl ? (
+              <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl">
+                <a href={mediaUrl} download>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </a>
+              </Button>
+            ) : (
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl" disabled>
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            )}
           </div>
         </header>
 
         {/* Video Player and Controls */}
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-5xl mx-auto space-y-6">
+            {actionError && (
+              <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{actionError}</span>
+              </div>
+            )}
+
             {/* Video Player with Bounding Boxes */}
-            <VideoPlayer videoId={id} location={video.location} />
+            <VideoPlayer
+              videoId={video.id}
+              location={video.location}
+              src={mediaUrl}
+              pedestrianCount={video.pedestrianCount}
+              timestamp={video.timestamp}
+              date={video.date}
+              isProcessed={Boolean(video.processedPath)}
+              videoRef={videoElementRef}
+              requestedSeek={requestedSeek}
+              onTimeUpdate={setCurrentTimeSeconds}
+              onDurationChange={setDurationSeconds}
+            />
             
             {/* Playback Timeline */}
-            <PlaybackTimeline 
-              startTime={video.startTime} 
-              endTime={video.endTime} 
+            <PlaybackTimeline
+              startTime={video.startTime}
+              endTime={video.endTime}
+              durationSeconds={durationSeconds}
+              currentTimeSeconds={currentTimeSeconds}
+              events={orderedEvents}
+              onSeek={requestSeek}
             />
             
             {/* Metadata Section */}
@@ -89,24 +305,56 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       {/* Right Sidebar - Filtered Event Feed */}
       <aside className="w-80 border-l border-border bg-card flex flex-col h-full">
         <AISearchBar />
-        <EventFeed filteredVideoId={id} />
+        <EventFeed
+          filteredVideoId={id}
+          events={orderedEvents}
+          loading={loading}
+          selectedEventId={selectedEventId}
+          onEventSelect={handleEventSelect}
+        />
         
         {/* Detection Details */}
-        <div className="p-4 border-t border-border">
+        <div className="border-t border-border p-4">
           <h4 className="text-sm font-medium text-foreground mb-3">Detection Details</h4>
-          <div className="space-y-2">
-            <DetectionDetail id={45} status="Heavy Occlusion" />
-            <DetectionDetail id={32} status="Clear Track" />
-            <DetectionDetail id={18} status="Partial Occlusion" />
-          </div>
+          {detectionDetails.length > 0 ? (
+            <div className="space-y-2">
+              {visibleDetectionDetails.map((detail) => (
+                <DetectionDetail key={detail.id} id={detail.id} status={detail.status} />
+              ))}
+              {hasCollapsedDetections && (
+                <Button
+                  variant="outline"
+                  className="w-full rounded-2xl border-border text-foreground hover:bg-secondary"
+                  onClick={() => setShowAllDetections((current) => !current)}
+                >
+                  {showAllDetections ? "Show less" : `View ${detectionDetails.length - 15} more`}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No tracked pedestrian IDs are available for this video yet.</p>
+          )}
         </div>
       </aside>
     </div>
   )
 }
 
+export default function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+        Loading video details...
+      </div>
+    }>
+      <VideoDetailContent params={params} />
+    </Suspense>
+  )
+}
+
 function DetectionDetail({ id, status }: { id: number; status: string }) {
-  const statusColor = status === "Clear Track" ? "text-primary" : status === "Heavy Occlusion" ? "text-destructive" : "text-accent"
+  const statusColor = status === "Tracked" ? "text-primary" : status === "Requires Review" ? "text-destructive" : "text-accent"
   
   return (
     <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/50 border border-border">

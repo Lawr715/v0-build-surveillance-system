@@ -1,15 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 
 interface WalkingLoaderProps {
   isVisible: boolean
   label: string
-  onClose?: () => void
+  progress?: number | null
 }
 
-export function WalkingLoader({ isVisible, label, onClose }: WalkingLoaderProps) {
+export function WalkingLoader({ isVisible, label, progress = null }: WalkingLoaderProps) {
   const [frame, setFrame] = useState(0)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   
   useEffect(() => {
     if (!isVisible) return
@@ -21,7 +22,25 @@ export function WalkingLoader({ isVisible, label, onClose }: WalkingLoaderProps)
     return () => clearInterval(interval)
   }, [isVisible])
 
+  useEffect(() => {
+    if (!isVisible) {
+      setElapsedSeconds(0)
+      return
+    }
+
+    const startedAt = Date.now()
+    setElapsedSeconds(0)
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isVisible])
+
   if (!isVisible) return null
+
+  const showElapsedTime = elapsedSeconds > 5
 
   // Walking stick figure frames
   const getStickFigure = (frameNum: number) => {
@@ -69,8 +88,8 @@ export function WalkingLoader({ isVisible, label, onClose }: WalkingLoaderProps)
   const pose = getStickFigure(frame)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-32 pointer-events-none">
-      <div className="pointer-events-auto bg-card border border-border rounded-3xl shadow-elevated p-6 flex flex-col items-center gap-4 min-w-[280px]">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center pt-32 pointer-events-none">
+      <div className="pointer-events-auto flex w-[min(92vw,32rem)] flex-col items-center gap-4 rounded-3xl border border-border bg-card p-6 shadow-elevated">
         {/* Walking Animation Container */}
         <div className="relative w-20 h-24 flex items-center justify-center">
           {/* Ground line with moving dots */}
@@ -155,24 +174,22 @@ export function WalkingLoader({ isVisible, label, onClose }: WalkingLoaderProps)
         </div>
         
         {/* Label */}
-        <div className="text-center">
-          <p className="text-sm font-medium text-white">{label}</p>
-          <div className="flex items-center justify-center gap-1 mt-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+        <div className="w-full max-w-[26rem] text-center">
+          <p className="break-words text-sm font-medium leading-snug text-foreground">{label}</p>
+          {typeof progress === "number" ? (
+            <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-primary">{progress}% complete</p>
+          ) : null}
+          <div className="mt-1 flex items-center justify-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
+          {showElapsedTime ? (
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              Elapsed time: <span className="font-medium text-foreground">{elapsedSeconds} {elapsedSeconds === 1 ? "second" : "seconds"}</span>
+            </p>
+          ) : null}
         </div>
-
-        {/* Optional close button */}
-        {onClose && (
-          <button 
-            onClick={onClose}
-            className="text-xs text-muted-foreground hover:text-white transition-colors"
-          >
-            Cancel
-          </button>
-        )}
       </div>
       
       {/* CSS Animation */}
@@ -190,14 +207,13 @@ export function WalkingLoader({ isVisible, label, onClose }: WalkingLoaderProps)
   )
 }
 
-// Loading context for app-wide loading state
-import { createContext, useContext, ReactNode } from "react"
-
 interface LoadingContextType {
-  showLoader: (label: string) => void
+  showLoader: (label: string, progress?: number | null) => void
+  updateLoader: (payload: { label?: string; progress?: number | null }) => void
   hideLoader: () => void
   isLoading: boolean
   loadingLabel: string
+  loadingProgress: number | null
 }
 
 const LoadingContext = createContext<LoadingContextType | null>(null)
@@ -205,21 +221,38 @@ const LoadingContext = createContext<LoadingContextType | null>(null)
 export function LoadingProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [loadingLabel, setLoadingLabel] = useState("")
+  const [loadingProgress, setLoadingProgress] = useState<number | null>(null)
 
-  const showLoader = (label: string) => {
+  const showLoader = useCallback((label: string, progress: number | null = null) => {
     setLoadingLabel(label)
+    setLoadingProgress(progress)
     setIsLoading(true)
-  }
+  }, [])
 
-  const hideLoader = () => {
+  const updateLoader = useCallback(({ label, progress }: { label?: string; progress?: number | null }) => {
+    if (typeof label === "string") {
+      setLoadingLabel(label)
+    }
+    if (progress !== undefined) {
+      setLoadingProgress(progress)
+    }
+  }, [])
+
+  const hideLoader = useCallback(() => {
     setIsLoading(false)
     setLoadingLabel("")
-  }
+    setLoadingProgress(null)
+  }, [])
+
+  const value = useMemo(
+    () => ({ showLoader, updateLoader, hideLoader, isLoading, loadingLabel, loadingProgress }),
+    [hideLoader, isLoading, loadingLabel, loadingProgress, showLoader, updateLoader],
+  )
 
   return (
-    <LoadingContext.Provider value={{ showLoader, hideLoader, isLoading, loadingLabel }}>
+    <LoadingContext.Provider value={value}>
       {children}
-      <WalkingLoader isVisible={isLoading} label={loadingLabel} />
+      <WalkingLoader isVisible={isLoading} label={loadingLabel} progress={loadingProgress} />
     </LoadingContext.Provider>
   )
 }

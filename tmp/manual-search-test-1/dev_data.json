@@ -1,0 +1,82 @@
+{
+  "model": {
+    "currentModel": "yolov8n-bytetrack.pt",
+    "uploadedAt": null
+  },
+  "locations": [
+    {
+      "id": "edsa-sec-walk",
+      "name": "EDSA Sec Walk",
+      "latitude": 14.6397,
+      "longitude": 121.0775,
+      "description": "Approximate Xavier Hall camera anchor along the EDSA security walkway.",
+      "address": "Ateneo de Manila University \u00b7 Xavier Hall"
+    },
+    {
+      "id": "kostka-walk",
+      "name": "Kostka Walk",
+      "latitude": 14.639,
+      "longitude": 121.0781,
+      "description": "Approximate Kostka Hall pedestrian corridor camera anchor.",
+      "address": "Ateneo de Manila University \u00b7 Kostka Hall"
+    },
+    {
+      "id": "gate-1-walkway",
+      "name": "Gate 1 Walkway",
+      "latitude": 14.6418,
+      "longitude": 121.0758,
+      "description": "Approximate Gate 1 walkway camera anchor.",
+      "address": "Ateneo de Manila University \u00b7 Gate 1"
+    },
+    {
+      "id": "gate-3-walkway",
+      "name": "Gate 3 Walkway",
+      "latitude": 14.6376,
+      "longitude": 121.0742,
+      "description": "Approximate Gate 3 walkway camera anchor.",
+      "address": "Ateneo de Manila University \u00b7 Gate 3"
+    }
+  ],
+  "videos": [
+    {
+      "id": "video-1",
+      "locationId": "edsa-sec-walk",
+      "location": "EDSA Sec Walk",
+      "timestamp": "10:00",
+      "date": "2026-03-17",
+      "startTime": "10:00",
+      "endTime": "10:30",
+      "gpsLat": 14.6397,
+      "gpsLng": 121.0775,
+      "pedestrianCount": 3,
+      "rawPath": null,
+      "processedPath": null
+    }
+  ],
+  "events": [],
+  "pedestrianTracks": [
+    {
+      "id": "track-blue",
+      "videoId": "video-1",
+      "pedestrianId": 7,
+      "location": "EDSA Sec Walk",
+      "firstTimestamp": "10:00:00 AM",
+      "lastTimestamp": "10:00:05 AM",
+      "bestTimestamp": "10:00:02 AM",
+      "firstFrame": 1,
+      "lastFrame": 12,
+      "bestFrame": 4,
+      "firstOffsetSeconds": 0.0,
+      "lastOffsetSeconds": 5.0,
+      "bestOffsetSeconds": 2.0,
+      "thumbnailPath": "storage/videos/processed/video-1/tracks/track-7.jpg",
+      "appearanceHints": [
+        "head region appears blue",
+        "lower clothing appears blue"
+      ],
+      "appearanceSummary": "Representative crop suggests head region appears blue, upper clothing appears white, lower clothing appears blue.",
+      "occlusionClass": null,
+      "bestArea": 4200.0
+    }
+  ]
+}

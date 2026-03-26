@@ -1,45 +1,47 @@
 "use client"
 
-import { Users, Video, MapPin, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react"
+import { AlertTriangle, MapPin, ScanLine, Users } from "lucide-react"
+import type { DashboardSummary } from "@/lib/api"
 
-const kpis = [
-  {
-    label: "Total Pedestrians Today",
-    value: "12,847",
-    change: "+12%",
-    trend: "up",
-    icon: Users,
-    color: "primary",
-  },
-  {
-    label: "Active Video Feeds",
-    value: "24",
-    change: "+4",
-    trend: "up",
-    icon: Video,
-    color: "accent",
-  },
-  {
-    label: "Monitored Locations",
-    value: "8",
-    change: "+2",
-    trend: "up",
-    icon: MapPin,
-    color: "chart-3",
-  },
-  {
-    label: "Alerts Generated",
-    value: "156",
-    change: "-8%",
-    trend: "down",
-    icon: AlertTriangle,
-    color: "chart-4",
-  },
-]
+interface KPICardsProps {
+  summary?: DashboardSummary | null
+  loading?: boolean
+}
 
-export function KPICards() {
+export function KPICards({ summary, loading = false }: KPICardsProps) {
+  const kpis = [
+    {
+      label: "Total Pedestrians",
+      value: loading ? "--" : (summary?.totalUniquePedestrians ?? 0).toLocaleString(),
+      hint: "Detections for the selected date",
+      icon: Users,
+      color: "primary",
+    },
+    {
+      label: "Average FPS",
+      value: loading ? "--" : `${summary?.averageFps?.toFixed(1) ?? "0.0"}`,
+      hint: "Current processing throughput",
+      icon: ScanLine,
+      color: "accent",
+    },
+    {
+      label: "Monitored Locations",
+      value: loading ? "--" : `${summary?.monitoredLocations ?? 0}`,
+      hint: "Locations contributing footage",
+      icon: MapPin,
+      color: "chart-3",
+    },
+    {
+      label: "Heavy Occlusions",
+      value: loading ? "--" : `${summary?.totalHeavyOcclusions ?? 0}`,
+      hint: "Events requiring review",
+      icon: AlertTriangle,
+      color: "chart-4",
+    },
+  ]
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       {kpis.map((kpi) => (
         <KPICard key={kpi.label} {...kpi} />
       ))}
@@ -50,15 +52,13 @@ export function KPICards() {
 function KPICard({
   label,
   value,
-  change,
-  trend,
+  hint,
   icon: Icon,
   color,
 }: {
   label: string
   value: string
-  change: string
-  trend: "up" | "down"
+  hint: string
   icon: React.ElementType
   color: string
 }) {
@@ -72,25 +72,19 @@ function KPICard({
   const colors = colorClasses[color] || colorClasses.primary
 
   return (
-    <div className="p-5 rounded-3xl bg-card border border-border hover:border-primary/30 transition-all shadow-elevated-sm">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-2xl ${colors.bg}`}>
-          <Icon className={`w-5 h-5 ${colors.icon}`} />
+    <div className="rounded-3xl border border-border bg-card p-5 shadow-elevated-sm transition-all hover:border-primary/30">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className={`rounded-2xl p-3 ${colors.bg}`}>
+          <Icon className={`h-5 w-5 ${colors.icon}`} />
         </div>
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-          trend === "up" ? "text-accent bg-accent/10" : "text-destructive bg-destructive/10"
-        }`}>
-          {trend === "up" ? (
-            <TrendingUp className="w-3 h-3" />
-          ) : (
-            <TrendingDown className="w-3 h-3" />
-          )}
-          {change}
+        <div className="rounded-full bg-secondary px-2 py-1 text-[11px] font-medium text-muted-foreground">
+          Live
         </div>
       </div>
-      
-      <p className={`text-3xl font-bold mb-1 ${colors.text}`}>{value}</p>
+
+      <p className={`mb-1 text-3xl font-bold ${colors.text}`}>{value}</p>
       <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
     </div>
   )
 }

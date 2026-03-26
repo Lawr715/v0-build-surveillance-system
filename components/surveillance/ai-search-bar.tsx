@@ -8,17 +8,12 @@ import { useLoading } from "@/components/ui/walking-loader"
 export function AISearchBar() {
   const [query, setQuery] = useState("")
   const router = useRouter()
-  const { showLoader, hideLoader } = useLoading()
+  const { showLoader } = useLoading()
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     if (query.trim()) {
-      showLoader("AI searching through footage...")
-      
-      // Simulate AI processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      hideLoader()
+      showLoader("ALIVE is searching for matching pedestrians...")
       router.push(`/search?q=${encodeURIComponent(query)}`)
     }
   }
@@ -34,7 +29,7 @@ export function AISearchBar() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask ALIVE..."
+            placeholder="Ask ALIVE… e.g. blue hat and blue shorts"
             className="w-full pl-11 pr-11 py-3 bg-secondary border border-border rounded-2xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
           />
           <button

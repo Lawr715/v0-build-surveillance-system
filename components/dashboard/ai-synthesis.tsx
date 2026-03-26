@@ -1,227 +1,94 @@
 "use client"
 
-import { Sparkles } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
+import type { AISynthesisResponse } from "@/lib/api"
 
 interface AISynthesisProps {
   selectedDate: string
   timeRange: string
+  data?: AISynthesisResponse | null
+  loading?: boolean
 }
 
-export function AISynthesis({ selectedDate, timeRange }: AISynthesisProps) {
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric"
-    })
-  }
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
+}
 
+function formatTimeRange(timeRange: string) {
+  return timeRange
+    .replace("whole-day", "Whole Day")
+    .replace("last-1h", "Last 1 Hour")
+    .replace("last-3h", "Last 3 Hours")
+    .replace("last-6h", "Last 6 Hours")
+    .replace("last-12h", "Last 12 Hours")
+    .replace("morning", "Morning")
+    .replace("afternoon", "Afternoon")
+    .replace("evening", "Evening")
+}
+
+const badgeToneClasses: Record<string, string> = {
+  blue: "bg-blue-500/10 text-blue-400",
+  green: "bg-emerald-500/10 text-emerald-400",
+  orange: "bg-orange-500/10 text-orange-400",
+  purple: "bg-purple-500/10 text-purple-400",
+  red: "bg-red-500/10 text-red-400",
+}
+
+export function AISynthesis({ selectedDate, timeRange, data, loading = false }: AISynthesisProps) {
   return (
-    <div className="rounded-3xl bg-[#2C2C2E] border border-[#3A3A3C] p-6 shadow-elevated">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-elevated-sm">
-          <Sparkles className="w-5 h-5 text-white" />
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-elevated">
+      <div className="mb-6 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-purple-600 shadow-elevated-sm">
+          <Sparkles className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            ALIVE AI Synthesis
-          </h3>
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">ALIVE AI Synthesis</h3>
           <p className="text-sm text-muted-foreground">
-            Intelligent summary for {formatDate(selectedDate)}
+            Intelligent summary for {formatDate(data?.date ?? selectedDate)} · {formatTimeRange(data?.timeRange ?? timeRange)}
           </p>
         </div>
       </div>
 
-      {/* Content Sections */}
-      <div className="space-y-6">
-        {/* 1. Executive Overview */}
-        <section>
-          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            1. Executive Overview
-          </h4>
-          <div className="space-y-3 text-sm text-foreground leading-relaxed">
-            <p>
-              Analysis of surveillance footage across all monitored zones detected a total of{" "}
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                1,452 pedestrians
-              </span>{" "}
-              during the selected time period. Peak pedestrian density occurred at{" "}
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#F97316]/10 text-[#F97316] font-bold">
-                12:05 PM
-              </span>{" "}
-              with{" "}
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                127 simultaneous detections
-              </span>.
-            </p>
-            <p>
-              Overall tracking accuracy remained high at{" "}
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#A855F7]/10 text-[#A855F7] font-bold">
-                94.7%
-              </span>{" "}
-              with ByteTrack maintaining consistent ID assignments. Minor occlusion events were handled effectively with re-identification confidence above{" "}
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#A855F7]/10 text-[#A855F7] font-bold">
-                89%
-              </span>.
-            </p>
-          </div>
-        </section>
-
-        {/* 2. Peak Traffic Events */}
-        <section>
-          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            2. Peak Traffic Events
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Event 1 */}
-            <div className="p-4 rounded-2xl bg-[#1C1C1E] border border-[#3A3A3C]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">Morning Rush</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#F97316]/10 text-[#F97316] font-bold text-xs">
-                  8:15 - 9:30 AM
-                </span>
+      {loading ? (
+        <div className="flex items-center justify-center py-10 text-muted-foreground">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Loading AI synthesis...
+        </div>
+      ) : data ? (
+        <div className="space-y-6">
+          {data.sections.map((section, index) => (
+            <section key={section.title}>
+              <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                {index + 1}. {section.title}
+              </h4>
+              <div className="rounded-2xl border border-border bg-secondary/30 p-4">
+                <p className="text-sm leading-relaxed text-foreground">{section.body}</p>
+                {section.badges.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {section.badges.map((badge) => (
+                      <span
+                        key={`${section.title}-${badge.label}`}
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${badgeToneClasses[badge.tone] ?? badgeToneClasses.blue}`}
+                      >
+                        {badge.label}: {badge.value}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-foreground">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#06B6D4]/10 text-[#06B6D4] font-bold">
-                  North Gate
-                </span>{" "}
-                recorded{" "}
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                  342 entries
-                </span>
-              </p>
-            </div>
-
-            {/* Event 2 */}
-            <div className="p-4 rounded-2xl bg-[#1C1C1E] border border-[#3A3A3C]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">Lunch Peak</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#F97316]/10 text-[#F97316] font-bold text-xs">
-                  12:00 - 1:15 PM
-                </span>
-              </div>
-              <p className="text-sm text-foreground">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#06B6D4]/10 text-[#06B6D4] font-bold">
-                  Main Hall
-                </span>{" "}
-                recorded{" "}
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                  489 crossings
-                </span>
-              </p>
-            </div>
-
-            {/* Event 3 */}
-            <div className="p-4 rounded-2xl bg-[#1C1C1E] border border-[#3A3A3C]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">Evening Exit</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#F97316]/10 text-[#F97316] font-bold text-xs">
-                  5:30 - 6:45 PM
-                </span>
-              </div>
-              <p className="text-sm text-foreground">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#06B6D4]/10 text-[#06B6D4] font-bold">
-                  South Entrance
-                </span>{" "}
-                recorded{" "}
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                  298 exits
-                </span>
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* 3. Spatial Breakdown */}
-        <section>
-          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            3. Spatial Breakdown
-          </h4>
-          <div className="space-y-3">
-            {/* Location 1 */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1C1C1E] border border-[#3A3A3C]">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-[#EF4444]" />
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#06B6D4]/10 text-[#06B6D4] font-bold text-sm">
-                  North Gate
-                </span>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-foreground">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                    456 pedestrians
-                  </span>
-                </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#EF4444]/10 text-[#EF4444] font-bold text-xs">
-                  Heavy Occlusion
-                </span>
-              </div>
-            </div>
-
-            {/* Location 2 */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1C1C1E] border border-[#3A3A3C]">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-[#F97316]" />
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#06B6D4]/10 text-[#06B6D4] font-bold text-sm">
-                  Main Hall
-                </span>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-foreground">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                    512 pedestrians
-                  </span>
-                </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#F97316]/10 text-[#F97316] font-bold text-xs">
-                  Moderate Occlusion
-                </span>
-              </div>
-            </div>
-
-            {/* Location 3 */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1C1C1E] border border-[#3A3A3C]">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-[#EAB308]" />
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#06B6D4]/10 text-[#06B6D4] font-bold text-sm">
-                  Parking Lot A
-                </span>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-foreground">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                    234 pedestrians
-                  </span>
-                </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#EAB308]/10 text-[#EAB308] font-bold text-xs">
-                  Light Occlusion
-                </span>
-              </div>
-            </div>
-
-            {/* Location 4 */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1C1C1E] border border-[#3A3A3C]">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-[#F97316]" />
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#06B6D4]/10 text-[#06B6D4] font-bold text-sm">
-                  South Entrance
-                </span>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-foreground">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#22C55E]/10 text-[#22C55E] font-bold">
-                    250 pedestrians
-                  </span>
-                </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#F97316]/10 text-[#F97316] font-bold text-xs">
-                  Moderate Occlusion
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+          No AI synthesis is available yet for this selection.
+        </div>
+      )}
     </div>
   )
 }

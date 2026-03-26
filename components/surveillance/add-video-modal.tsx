@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -18,31 +18,196 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Video, Upload, X, FileVideo } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { FileVideo, Upload, Video, X, Zap } from "lucide-react"
 import { useLoading } from "@/components/ui/walking-loader"
+import type { VideoUploadStatus } from "@/lib/api"
 
 interface AddVideoModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   locations: Array<{ id: string; name: string }>
+  initialLocationId?: string
   onAddVideo?: (data: {
     file: File
     locationId: string
     date: string
     startTime: string
     endTime: string
-  }) => void
+    fastMode: boolean
+    onProgress?: (status: VideoUploadStatus) => void
+  }) => void | Promise<void>
 }
 
-export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: AddVideoModalProps) {
+function formatDurationHours(durationSeconds: number) {
+  const precision = durationSeconds < 60 ? 5 : durationSeconds < 3600 ? 4 : 2
+  return (durationSeconds / 3600).toFixed(precision).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1")
+}
+
+function formatHumanDuration(totalSeconds: number) {
+  if (totalSeconds < 60) {
+    return `${totalSeconds} sec`
+  }
+
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const parts = [
+    hours > 0 ? `${hours} hr${hours === 1 ? "" : "s"}` : null,
+    minutes > 0 ? `${minutes} min` : null,
+    seconds > 0 ? `${seconds} sec` : null,
+  ].filter(Boolean)
+
+  return parts.join(" ")
+}
+
+function computeSchedule(startTime: string, durationHours: string) {
+  const [hoursPart, minutesPart, secondsPart = "0"] = startTime.split(":")
+  const startHours = Number(hoursPart)
+  const startMinutes = Number(minutesPart)
+  const startSeconds = Number(secondsPart)
+  const parsedDuration = Number(durationHours)
+
+  if (!startTime || !Number.isFinite(startHours) || !Number.isFinite(startMinutes) || !Number.isFinite(startSeconds) || !Number.isFinite(parsedDuration) || parsedDuration <= 0) {
+    return null
+  }
+
+  const durationSeconds = Math.max(1, Math.round(parsedDuration * 3600))
+  const totalSeconds = startHours * 3600 + startMinutes * 60 + startSeconds + durationSeconds
+  const dayOffset = Math.floor(totalSeconds / (24 * 3600))
+  const endSeconds = ((totalSeconds % (24 * 3600)) + (24 * 3600)) % (24 * 3600)
+  const endHours = Math.floor(endSeconds / 3600)
+  const endMinuteValue = Math.floor((endSeconds % 3600) / 60)
+  const endSecondValue = endSeconds % 60
+  const includeSeconds = endSecondValue > 0 || startTime.split(":").length === 3 || durationSeconds % 60 !== 0
+
+  return {
+    endTime: includeSeconds
+      ? `${endHours.toString().padStart(2, "0")}:${endMinuteValue.toString().padStart(2, "0")}:${endSecondValue.toString().padStart(2, "0")}`
+      : `${endHours.toString().padStart(2, "0")}:${endMinuteValue.toString().padStart(2, "0")}`,
+    durationLabel: formatHumanDuration(durationSeconds),
+    dayOffset,
+  }
+}
+
+function readVideoDuration(file: File) {
+  return new Promise<number>((resolve, reject) => {
+    const video = document.createElement("video")
+    const objectUrl = URL.createObjectURL(file)
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl)
+      video.removeAttribute("src")
+    }
+
+    video.preload = "metadata"
+    video.onloadedmetadata = () => {
+      const duration = Number(video.duration)
+      cleanup()
+      if (Number.isFinite(duration) && duration > 0) {
+        resolve(duration)
+        return
+      }
+      reject(new Error("The selected video does not expose a readable duration."))
+    }
+    video.onerror = () => {
+      cleanup()
+      reject(new Error("Could not read the selected video's duration."))
+    }
+    video.src = objectUrl
+  })
+}
+
+export function AddVideoModal({ open, onOpenChange, locations, initialLocationId, onAddVideo }: AddVideoModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [locationId, setLocationId] = useState("")
   const [date, setDate] = useState("")
   const [startTime, setStartTime] = useState("")
-  const [endTime, setEndTime] = useState("")
+  const [durationHours, setDurationHours] = useState("1")
+  const [detectedDurationSeconds, setDetectedDurationSeconds] = useState<number | null>(null)
+  const [durationError, setDurationError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isDetectingDuration, setIsDetectingDuration] = useState(false)
+  const [fastMode, setFastMode] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { showLoader, hideLoader } = useLoading()
+  const { showLoader, updateLoader, hideLoader } = useLoading()
+
+  useEffect(() => {
+    if (open) {
+      setLocationId(initialLocationId ?? "")
+      setSubmitError(null)
+    }
+  }, [initialLocationId, open])
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setDetectedDurationSeconds(null)
+      setDurationError(null)
+      setIsDetectingDuration(false)
+      return
+    }
+
+    let isCancelled = false
+    setIsDetectingDuration(true)
+    setDurationError(null)
+
+    void readVideoDuration(selectedFile)
+      .then((durationSeconds) => {
+        if (isCancelled) return
+        const roundedSeconds = Math.max(1, Math.round(durationSeconds))
+        setDetectedDurationSeconds(roundedSeconds)
+        setDurationHours(formatDurationHours(roundedSeconds))
+      })
+      .catch((error) => {
+        if (isCancelled) return
+        setDetectedDurationSeconds(null)
+        setDurationError(error instanceof Error ? error.message : "Could not read the video duration.")
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsDetectingDuration(false)
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [selectedFile])
+
+  const computedSchedule = useMemo(() => computeSchedule(startTime, durationHours), [durationHours, startTime])
+  const submitDisabledReason = useMemo(() => {
+    if (isSubmitting) {
+      return "Upload already in progress."
+    }
+
+    if (isDetectingDuration) {
+      return "Reading the selected video before enabling upload..."
+    }
+
+    if (!selectedFile) {
+      return "Select a video file to continue."
+    }
+
+    if (!locationId) {
+      return "Choose a location to continue."
+    }
+
+    if (!date) {
+      return "Choose a start date to continue."
+    }
+
+    if (!startTime) {
+      return "Choose a start time to continue."
+    }
+
+    if (!computedSchedule) {
+      return "Enter a valid start time and duration to continue."
+    }
+
+    return null
+  }, [computedSchedule, date, isDetectingDuration, isSubmitting, locationId, selectedFile, startTime])
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -58,10 +223,11 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
+    setSubmitError(null)
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0]
-      if (file.type === "video/mp4" || file.type === "video/x-msvideo" || file.name.endsWith('.avi')) {
+      if (file.type === "video/mp4" || file.type === "video/x-msvideo" || file.name.endsWith(".avi")) {
         setSelectedFile(file)
       }
     }
@@ -69,27 +235,36 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+      setSubmitError(null)
       setSelectedFile(e.target.files[0])
     }
   }
 
   const handleSubmit = async () => {
-    if (selectedFile && locationId && date && startTime && endTime) {
-      handleClose()
-      showLoader("Uploading video and processing...")
-      
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      
-      onAddVideo?.({
+    if (!selectedFile || !locationId || !date || !startTime || !computedSchedule || isSubmitting) return
+
+    setSubmitError(null)
+    setIsSubmitting(true)
+    showLoader(fastMode ? "Uploading video in fast mode..." : "Uploading video...", 0)
+
+    try {
+      await onAddVideo?.({
         file: selectedFile,
         locationId,
         date,
         startTime,
-        endTime,
+        endTime: computedSchedule.endTime,
+        fastMode,
+        onProgress: ({ message, progressPercent }) => {
+          updateLoader({ label: message, progress: progressPercent })
+        },
       })
-      
+      handleClose()
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Failed to upload video.")
+    } finally {
       hideLoader()
+      setIsSubmitting(false)
     }
   }
 
@@ -98,20 +273,51 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
     setLocationId("")
     setDate("")
     setStartTime("")
-    setEndTime("")
+    setDurationHours("1")
+    setDetectedDurationSeconds(null)
+    setDurationError(null)
+    setSubmitError(null)
+    setIsDetectingDuration(false)
+    setFastMode(false)
     onOpenChange(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="bg-card border-border sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          if (isSubmitting) {
+            return
+          }
+
+          handleClose()
+        } else {
+          onOpenChange(nextOpen)
+        }
+      }}
+    >
+      <DialogContent
+        showCloseButton={!isSubmitting}
+        className="bg-card border-border sm:max-w-md"
+        onEscapeKeyDown={(event) => {
+          if (isSubmitting) {
+            event.preventDefault()
+          }
+        }}
+        onInteractOutside={(event) => {
+          if (isSubmitting) {
+            event.preventDefault()
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <Video className="w-5 h-5" />
             Add New Video
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Upload a video file and configure its metadata.
+            Upload a video file, choose the start time, and let the system calculate the end time from the duration.
           </DialogDescription>
         </DialogHeader>
         
@@ -150,11 +356,20 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
                     <p className="text-xs text-muted-foreground">
                       {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                     </p>
+                    {isDetectingDuration ? (
+                      <p className="text-xs text-primary">Reading duration…</p>
+                    ) : detectedDurationSeconds !== null ? (
+                      <p className="text-xs text-primary">Detected duration: {formatHumanDuration(detectedDurationSeconds)}</p>
+                    ) : durationError ? (
+                      <p className="text-xs text-amber-400">{durationError}</p>
+                    ) : null}
                   </div>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     onClick={() => setSelectedFile(null)}
+                    disabled={isSubmitting}
                     className="h-8 w-8"
                   >
                     <X className="w-4 h-4" />
@@ -163,7 +378,7 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
               ) : (
                 <div 
                   className="flex flex-col items-center gap-2 cursor-pointer"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => !isSubmitting && fileInputRef.current?.click()}
                 >
                   <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                     <Upload className="w-6 h-6 text-muted-foreground" />
@@ -180,7 +395,10 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
           {/* Location Dropdown */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Location</label>
-            <Select value={locationId} onValueChange={setLocationId}>
+            <Select value={locationId} onValueChange={(value) => {
+              setSubmitError(null)
+              setLocationId(value)
+            }}>
               <SelectTrigger className="bg-secondary border-border text-foreground">
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
@@ -196,11 +414,14 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
 
           {/* Date */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Date</label>
+            <label className="text-sm font-medium text-foreground">Start Date</label>
             <Input 
               type="date" 
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                setSubmitError(null)
+                setDate(e.target.value)
+              }}
               className="bg-secondary border-border text-foreground"
             />
           </div>
@@ -211,33 +432,92 @@ export function AddVideoModal({ open, onOpenChange, locations, onAddVideo }: Add
               <label className="text-sm font-medium text-foreground">Start Time</label>
               <Input 
                 type="time" 
+                step="1"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => {
+                  setSubmitError(null)
+                  setStartTime(e.target.value)
+                }}
                 className="bg-secondary border-border text-foreground"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">End Time</label>
+              <label className="text-sm font-medium text-foreground">Duration (Hours)</label>
               <Input 
-                type="time" 
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                type="number"
+                min="0.0003"
+                step="0.0001"
+                inputMode="decimal"
+                value={durationHours}
+                onChange={(e) => {
+                  setSubmitError(null)
+                  setDurationHours(e.target.value)
+                }}
                 className="bg-secondary border-border text-foreground"
               />
+              <p className="text-xs text-muted-foreground">
+                {isDetectingDuration
+                  ? "Reading the uploaded file to auto-fill the true duration..."
+                  : detectedDurationSeconds !== null
+                    ? `Auto-filled from video metadata: ${formatHumanDuration(detectedDurationSeconds)}.`
+                    : durationError ?? "Upload a file to auto-fill this value, then adjust it manually if needed."}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-secondary/40 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Scheduled coverage</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {computedSchedule
+                    ? `Starts at ${startTime} and ends at ${computedSchedule.endTime}${computedSchedule.dayOffset > 0 ? ` (+${computedSchedule.dayOffset} day)` : ""}. Total duration: ${computedSchedule.durationLabel}.`
+                    : "Enter a valid start time and duration to preview the coverage window."}
+                </p>
+              </div>
+              {computedSchedule && <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">Auto end time</span>}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-secondary/40 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Zap className="h-4 w-4 text-primary" />
+                  Fast Mode
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Speeds up local testing by skipping some frames and using a smaller inference size.
+                </p>
+              </div>
+              <Switch checked={fastMode} onCheckedChange={setFastMode} disabled={isSubmitting} className="data-[state=checked]:bg-primary" />
             </div>
           </div>
         </div>
 
+        {submitError && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {submitError}
+          </div>
+        )}
+
+        {!submitError && submitDisabledReason && (
+          <p className="text-xs text-muted-foreground">
+            {submitDisabledReason}
+          </p>
+        )}
+
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} className="border-border text-foreground">
+          <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting} className="border-border text-foreground">
             Cancel
           </Button>
           <Button 
-            onClick={handleSubmit}
-            disabled={!selectedFile || !locationId || !date || !startTime || !endTime}
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={!selectedFile || !locationId || !date || !startTime || !computedSchedule || isSubmitting || isDetectingDuration}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Add Video
+            {isSubmitting ? "Uploading..." : isDetectingDuration ? "Reading file..." : "Add Video"}
           </Button>
         </DialogFooter>
       </DialogContent>
