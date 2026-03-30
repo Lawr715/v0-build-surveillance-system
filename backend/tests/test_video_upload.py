@@ -4,6 +4,7 @@ import json
 import threading
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import inference, main, store
@@ -1570,17 +1571,22 @@ def test_dashboard_endpoints_only_surface_real_footage_and_neutral_empty_locatio
         traffic_response = client.get("/api/dashboard/traffic", params={"date": "2026-03-17", "timeRange": "whole-day"})
         drilldown_response = client.get(
             "/api/dashboard/traffic",
-            params={"date": "2026-03-17", "timeRange": "whole-day", "focusTime": "10:00"},
+            params={"date": "2026-03-17", "timeRange": "whole-day", "focusTime": "10:00", "zoomLevel": 1},
+        )
+        nested_drilldown_response = client.get(
+            "/api/dashboard/traffic",
+            params={"date": "2026-03-17", "timeRange": "whole-day", "focusTime": "10:00", "zoomLevel": 2},
         )
         occlusion_trends_response = client.get(
             "/api/dashboard/occlusion-trends",
-            params={"date": "2026-03-17", "timeRange": "whole-day", "focusTime": "10:00"},
+            params={"date": "2026-03-17", "timeRange": "whole-day", "focusTime": "10:00", "zoomLevel": 1},
         )
         occlusion_response = client.get("/api/dashboard/occlusion", params={"date": "2026-03-17", "timeRange": "whole-day"})
 
     assert summary_response.status_code == 200
     assert traffic_response.status_code == 200
     assert drilldown_response.status_code == 200
+    assert nested_drilldown_response.status_code == 200
     assert occlusion_trends_response.status_code == 200
     assert occlusion_response.status_code == 200
 
@@ -1592,22 +1598,45 @@ def test_dashboard_endpoints_only_surface_real_footage_and_neutral_empty_locatio
     assert traffic["timeRange"] == "whole-day"
     assert traffic["series"]
     assert traffic["bucketMinutes"] == 60
+    assert traffic["zoomLevel"] == 0
+    assert traffic["canZoomIn"] is True
     assert traffic["isDrilldown"] is False
     assert traffic["locationTotals"][0] == {"location": "EDSA Sec Walk", "totalPedestrians": 3}
-    assert set(traffic["series"][0].keys()) == {"time", "EDSA Sec Walk"}
+    whole_day_bucket = next(point for point in traffic["series"] if point["time"] == "10:00")
+    assert set(whole_day_bucket.keys()) == {"time", "cumulativeUniquePedestrians", "averageVisiblePedestrians"}
+    assert whole_day_bucket["cumulativeUniquePedestrians"] == 3
+    assert whole_day_bucket["averageVisiblePedestrians"] == 1.0
 
     drilldown = drilldown_response.json()
-    assert drilldown["bucketMinutes"] == 20
+    assert drilldown["bucketMinutes"] == 15
+    assert drilldown["zoomLevel"] == 1
+    assert drilldown["canZoomIn"] is True
     assert drilldown["isDrilldown"] is True
     assert drilldown["focusTime"] == "10:00"
-    assert drilldown["windowStart"] == "08:00"
-    assert drilldown["windowEnd"] == "12:00"
+    assert drilldown["windowStart"] == "10:00"
+    assert drilldown["windowEnd"] == "11:00"
     assert any(point["time"] == "10:00" for point in drilldown["series"])
+    first_drill_bucket = next(point for point in drilldown["series"] if point["time"] == "10:00")
+    assert first_drill_bucket["cumulativeUniquePedestrians"] == 3
+    assert first_drill_bucket["averageVisiblePedestrians"] == 1.0
+
+    nested_drilldown = nested_drilldown_response.json()
+    assert nested_drilldown["bucketMinutes"] == 5
+    assert nested_drilldown["zoomLevel"] == 2
+    assert nested_drilldown["canZoomIn"] is False
+    assert nested_drilldown["windowStart"] == "10:00"
+    assert nested_drilldown["windowEnd"] == "10:15"
+    nested_bucket = next(point for point in nested_drilldown["series"] if point["time"] == "10:05")
+    assert nested_bucket["cumulativeUniquePedestrians"] == 3
+    assert nested_bucket["averageVisiblePedestrians"] == 1.0
 
     occlusion_trends = occlusion_trends_response.json()
     trend_bucket = next(point for point in occlusion_trends["series"] if point["time"] == "10:00")
-    assert trend_bucket["Light"] == 1
-    assert trend_bucket["Moderate"] == 1
+    assert occlusion_trends["bucketMinutes"] == 15
+    assert occlusion_trends["zoomLevel"] == 1
+    assert occlusion_trends["canZoomIn"] is True
+    assert trend_bucket["Light"] == pytest.approx(0.33, abs=0.01)
+    assert trend_bucket["Moderate"] == pytest.approx(0.33, abs=0.01)
     assert trend_bucket["Heavy"] == 0
 
     occlusion = occlusion_response.json()
@@ -1622,3 +1651,126 @@ def test_dashboard_endpoints_only_surface_real_footage_and_neutral_empty_locatio
     assert edsa_sec_walk["score"] is not None
     assert kostka_walk["hasFootage"] is False
     assert kostka_walk["state"] == "no-footage"
+
+
+def test_dashboard_traffic_uses_full_track_totals_instead_of_truncated_events(monkeypatch, tmp_path: Path) -> None:
+    configure_temp_storage(monkeypatch, tmp_path)
+
+    state = store.seed_state()
+    state["videos"] = [
+        {
+            "id": "video-kostka-1",
+            "locationId": "kostka-walk",
+            "location": "Kostka Walk",
+            "timestamp": "10:00",
+            "date": "2026-03-17",
+            "startTime": "10:00",
+            "endTime": "10:10",
+            "gpsLat": 14.6390,
+            "gpsLng": 121.0781,
+            "pedestrianCount": 5,
+            "rawPath": None,
+            "processedPath": None,
+        },
+        {
+            "id": "video-kostka-2",
+            "locationId": "kostka-walk",
+            "location": "Kostka Walk",
+            "timestamp": "10:10",
+            "date": "2026-03-17",
+            "startTime": "10:10",
+            "endTime": "10:20",
+            "gpsLat": 14.6390,
+            "gpsLng": 121.0781,
+            "pedestrianCount": 3,
+            "rawPath": None,
+            "processedPath": None,
+        },
+    ]
+    state["events"] = [
+        {
+            "id": "evt-kostka-1",
+            "type": "detection",
+            "location": "Kostka Walk",
+            "timestamp": "10:00:00 AM",
+            "description": "Pedestrian ID #1 detected at frame 1",
+            "videoId": "video-kostka-1",
+            "pedestrianId": 1,
+            "frame": 1,
+            "offsetSeconds": 0.0,
+        },
+        {
+            "id": "evt-kostka-2",
+            "type": "detection",
+            "location": "Kostka Walk",
+            "timestamp": "10:02:00 AM",
+            "description": "Pedestrian ID #2 detected at frame 20",
+            "videoId": "video-kostka-1",
+            "pedestrianId": 2,
+            "frame": 20,
+            "offsetSeconds": 120.0,
+        },
+        {
+            "id": "evt-kostka-3",
+            "type": "detection",
+            "location": "Kostka Walk",
+            "timestamp": "10:10:00 AM",
+            "description": "Pedestrian ID #1 detected at frame 1",
+            "videoId": "video-kostka-2",
+            "pedestrianId": 1,
+            "frame": 1,
+            "offsetSeconds": 0.0,
+        },
+    ]
+    state["pedestrianTracks"] = [
+        {
+            "id": f"track-kostka-1-{pedestrian_id}",
+            "videoId": "video-kostka-1",
+            "pedestrianId": pedestrian_id,
+            "location": "Kostka Walk",
+            "firstTimestamp": timestamp,
+            "bestTimestamp": timestamp,
+            "firstOffsetSeconds": float(offset_seconds),
+            "bestOffsetSeconds": float(offset_seconds),
+        }
+        for pedestrian_id, timestamp, offset_seconds in [
+            (1, "10:00:00 AM", 0),
+            (2, "10:00:10 AM", 10),
+            (3, "10:00:20 AM", 20),
+            (4, "10:00:30 AM", 30),
+            (5, "10:00:40 AM", 40),
+        ]
+    ] + [
+        {
+            "id": f"track-kostka-2-{pedestrian_id}",
+            "videoId": "video-kostka-2",
+            "pedestrianId": pedestrian_id,
+            "location": "Kostka Walk",
+            "firstTimestamp": timestamp,
+            "bestTimestamp": timestamp,
+            "firstOffsetSeconds": float(offset_seconds),
+            "bestOffsetSeconds": float(offset_seconds),
+        }
+        for pedestrian_id, timestamp, offset_seconds in [
+            (1, "10:10:00 AM", 0),
+            (2, "10:10:10 AM", 10),
+            (3, "10:10:20 AM", 20),
+        ]
+    ]
+    store.save_state(state)
+
+    with TestClient(main.app) as client:
+        summary_response = client.get("/api/dashboard/summary", params={"date": "2026-03-17"})
+        traffic_response = client.get("/api/dashboard/traffic", params={"date": "2026-03-17", "timeRange": "whole-day"})
+
+    assert summary_response.status_code == 200
+    assert traffic_response.status_code == 200
+
+    summary = summary_response.json()
+    traffic = traffic_response.json()
+    whole_day_bucket = next(point for point in traffic["series"] if point["time"] == "10:00")
+
+    assert summary["totalUniquePedestrians"] == 8
+    assert traffic["locationTotals"] == [{"location": "Kostka Walk", "totalPedestrians": 8}]
+    assert whole_day_bucket["cumulativeUniquePedestrians"] == 8
+    assert whole_day_bucket["averageVisiblePedestrians"] == 1.0

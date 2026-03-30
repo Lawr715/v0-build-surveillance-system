@@ -82,6 +82,8 @@ class TrafficResponse(BaseModel):
     timeRange: str
     series: list[dict[str, object]] = Field(default_factory=list)
     bucketMinutes: int = 60
+    zoomLevel: int = 0
+    canZoomIn: bool = False
     isDrilldown: bool = False
     focusTime: Optional[str] = None
     windowStart: Optional[str] = None
@@ -93,6 +95,8 @@ class OcclusionTrendResponse(BaseModel):
     timeRange: str
     series: list[dict[str, object]] = Field(default_factory=list)
     bucketMinutes: int = 60
+    zoomLevel: int = 0
+    canZoomIn: bool = False
     isDrilldown: bool = False
     focusTime: Optional[str] = None
     windowStart: Optional[str] = None

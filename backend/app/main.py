@@ -409,8 +409,9 @@ def get_dashboard_traffic(
     date: Optional[str] = None,
     timeRange: str = "whole-day",
     focusTime: Optional[str] = None,
+    zoomLevel: int = 0,
 ) -> dict[str, object]:
-    return store.dashboard_traffic(date, timeRange, focusTime)
+    return store.dashboard_traffic(date, timeRange, focusTime, zoomLevel)
 
 
 @app.get("/api/dashboard/occlusion-trends", response_model=schemas.OcclusionTrendResponse)
@@ -418,8 +419,9 @@ def get_dashboard_occlusion_trends(
     date: Optional[str] = None,
     timeRange: str = "whole-day",
     focusTime: Optional[str] = None,
+    zoomLevel: int = 0,
 ) -> dict[str, object]:
-    return store.dashboard_occlusion_trends(date, timeRange, focusTime)
+    return store.dashboard_occlusion_trends(date, timeRange, focusTime, zoomLevel)
 
 
 @app.get("/api/dashboard/occlusion", response_model=schemas.OcclusionMapResponse)

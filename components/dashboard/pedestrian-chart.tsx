@@ -15,12 +15,18 @@ import { Loader2, RotateCcw, ZoomIn } from "lucide-react"
 import type { LocationTotal, TrafficPoint } from "@/lib/api"
 
 interface PedestrianChartProps {
+  title: string
+  description: string
   timeRange: string
   selectedDate: string
   data: TrafficPoint[]
-  locationTotals: LocationTotal[]
+  metricKey: "cumulativeUniquePedestrians" | "averageVisiblePedestrians"
+  metricLabel: string
+  seriesColor: string
+  locationTotals?: LocationTotal[]
   bucketMinutes: number
-  isDrilldown: boolean
+  zoomLevel: number
+  canZoomIn: boolean
   focusTime?: string | null
   windowStart?: string | null
   windowEnd?: string | null
@@ -43,18 +49,42 @@ function formatTimeRangeLabel(timeRange: string) {
     .replace("evening", "Evening")
 }
 
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
+function formatDateLabel(selectedDate: string) {
+  return selectedDate
+    ? new Date(selectedDate).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : "All dates"
+}
+
+function formatMetricValue(metricKey: PedestrianChartProps["metricKey"], value: number) {
+  return metricKey === "averageVisiblePedestrians" ? value.toFixed(2) : Math.round(value).toLocaleString()
+}
+
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+  metricKey,
+}: {
+  active?: boolean
+  payload?: Array<{ name: string; value: number; color: string }>
+  label?: string
+  metricKey: PedestrianChartProps["metricKey"]
+}) => {
   if (active && payload && payload.length) {
+    const entry = payload[0]
     return (
       <div className="rounded-2xl border border-border bg-popover p-3 shadow-elevated">
         <p className="mb-2 text-sm font-medium text-foreground">{label}</p>
-        {payload.map((entry, index) => (
-          <div key={index} className="flex items-center gap-2 text-sm">
-            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-muted-foreground">{entry.name}:</span>
-            <span className="font-medium text-foreground">{entry.value}</span>
-          </div>
-        ))}
+        <div className="flex items-center gap-2 text-sm">
+          <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          <span className="text-muted-foreground">{entry.name}:</span>
+          <span className="font-medium text-foreground">{formatMetricValue(metricKey, Number(entry.value ?? 0))}</span>
+        </div>
       </div>
     )
   }
@@ -63,12 +93,18 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function PedestrianChart({
+  title,
+  description,
   timeRange,
   selectedDate,
   data,
-  locationTotals,
+  metricKey,
+  metricLabel,
+  seriesColor,
+  locationTotals = [],
   bucketMinutes,
-  isDrilldown,
+  zoomLevel,
+  canZoomIn,
   focusTime,
   windowStart,
   windowEnd,
@@ -76,32 +112,18 @@ export function PedestrianChart({
   onTimeSelect,
   onResetZoom,
 }: PedestrianChartProps) {
-  const locations = data.length > 0 ? Object.keys(data[0]).filter((key) => key !== "time") : []
-  const totals = locationTotals.length > 0
-    ? locationTotals.map((item, index) => ({
-        location: item.location,
-        count: item.totalPedestrians,
-        color: SERIES_COLORS[index % SERIES_COLORS.length],
-      }))
-    : locations.map((location, index) => ({
-        location,
-        count: data.reduce((sum, point) => sum + Number(point[location] ?? 0), 0),
-        color: SERIES_COLORS[index % SERIES_COLORS.length],
-      }))
+  const totals = locationTotals.map((item, index) => ({
+    location: item.location,
+    count: item.totalPedestrians,
+    color: SERIES_COLORS[index % SERIES_COLORS.length],
+  }))
 
-  const subtitle = isDrilldown
-    ? `20-minute drilldown around ${focusTime ?? "the selected hour"} · ${windowStart ?? "--"}–${windowEnd ?? "--"}`
-    : `${selectedDate
-        ? new Date(selectedDate).toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
-        : "All dates"} - ${formatTimeRangeLabel(timeRange)}`
+  const subtitle = zoomLevel > 0
+    ? `Zoom level ${zoomLevel} · ${windowStart ?? focusTime ?? "--"}–${windowEnd ?? "--"}`
+    : `${formatDateLabel(selectedDate)} - ${formatTimeRangeLabel(timeRange)}`
 
   const handleChartClick = (state: unknown) => {
-    if (isDrilldown || typeof onTimeSelect !== "function") {
+    if (!canZoomIn || typeof onTimeSelect !== "function") {
       return
     }
     const candidate = typeof state === "object" && state !== null && "activeLabel" in state ? (state as { activeLabel?: unknown }).activeLabel : undefined
@@ -114,15 +136,11 @@ export function PedestrianChart({
     <div className="rounded-3xl border border-border bg-card p-6 shadow-elevated">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Pedestrian Count Over Time</h3>
+          <h3 className="text-base font-semibold text-foreground">{title}</h3>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {isDrilldown
-              ? `This zoomed view shows whether a pedestrian peak sustains or fades across neighboring ${bucketMinutes}-minute buckets.`
-              : "Click any hourly bucket to zoom into a 4-hour, 20-minute drilldown around that time."}
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
-        {isDrilldown && onResetZoom && (
+        {zoomLevel > 0 && onResetZoom && (
           <Button variant="outline" size="sm" className="rounded-2xl" onClick={onResetZoom}>
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset Zoom
@@ -140,16 +158,10 @@ export function PedestrianChart({
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }} onClick={handleChartClick}>
               <defs>
-                {locations.map((location, index) => {
-                  const gradientId = `${location.replace(/[^a-z0-9]+/gi, "")}-gradient`
-                  const color = SERIES_COLORS[index % SERIES_COLORS.length]
-                  return (
-                    <linearGradient key={gradientId} id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={color} stopOpacity={0} />
-                    </linearGradient>
-                  )
-                })}
+                <linearGradient id={`${metricKey}-gradient`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={seriesColor} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={seriesColor} stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272A" vertical={false} />
               <XAxis dataKey="time" stroke="#71717A" tick={{ fill: "#71717A", fontSize: 12 }} axisLine={{ stroke: "#27272A" }} />
@@ -157,32 +169,26 @@ export function PedestrianChart({
                 stroke="#71717A"
                 tick={{ fill: "#71717A", fontSize: 12 }}
                 axisLine={{ stroke: "#27272A" }}
-                label={{ value: "Pedestrian Count", angle: -90, position: "insideLeft", fill: "#71717A", fontSize: 12 }}
+                label={{ value: metricLabel, angle: -90, position: "insideLeft", fill: "#71717A", fontSize: 12 }}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip metricKey={metricKey} />} />
               <Legend wrapperStyle={{ paddingTop: "20px" }} formatter={(value) => <span className="text-sm text-foreground">{value}</span>} />
-              {locations.map((location, index) => {
-                const color = SERIES_COLORS[index % SERIES_COLORS.length]
-                const gradientId = `${location.replace(/[^a-z0-9]+/gi, "")}-gradient`
-                return (
-                  <Area
-                    key={location}
-                    type="monotone"
-                    dataKey={location}
-                    stroke={color}
-                    strokeWidth={2}
-                    fill={`url(#${gradientId})`}
-                    dot={false}
-                    activeDot={{ r: 4, fill: color }}
-                    cursor={!isDrilldown ? "pointer" : "default"}
-                  />
-                )
-              })}
+              <Area
+                type="linear"
+                dataKey={metricKey}
+                name={metricLabel}
+                stroke={seriesColor}
+                strokeWidth={2.5}
+                fill={`url(#${metricKey}-gradient)`}
+                dot={false}
+                activeDot={{ r: 4, fill: seriesColor }}
+                cursor={canZoomIn ? "pointer" : "default"}
+              />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
           <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-muted-foreground">
-            No traffic data is available for this time range yet.
+            No pedestrian analytics are available for this time range yet.
           </div>
         )}
       </div>
@@ -195,10 +201,10 @@ export function PedestrianChart({
         </div>
       )}
 
-      {!isDrilldown && data.length > 0 && (
+      {canZoomIn && data.length > 0 && (
         <div className="mt-4 flex items-center gap-2 rounded-2xl border border-border/70 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
           <ZoomIn className="h-4 w-4" />
-          Click an hourly peak to inspect 20-minute changes before and after the spike.
+          Click a bucket to zoom into a finer time interval for this same range.
         </div>
       )}
     </div>

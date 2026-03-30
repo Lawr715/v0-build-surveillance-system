@@ -76,6 +76,8 @@ export interface TrafficResponse {
   timeRange: string
   series: TrafficPoint[]
   bucketMinutes: number
+  zoomLevel: number
+  canZoomIn: boolean
   isDrilldown: boolean
   focusTime?: string | null
   windowStart?: string | null
@@ -87,6 +89,8 @@ export interface OcclusionTrendResponse {
   timeRange: string
   series: TrafficPoint[]
   bucketMinutes: number
+  zoomLevel: number
+  canZoomIn: boolean
   isDrilldown: boolean
   focusTime?: string | null
   windowStart?: string | null
@@ -430,16 +434,26 @@ export function getDashboardSummary(date?: string) {
   return request<DashboardSummary>(withQuery("/api/dashboard/summary", { date }))
 }
 
-export function getDashboardTraffic(date?: string, timeRange = "whole-day", focusTime?: string) {
-  return request<TrafficResponse>(withQuery("/api/dashboard/traffic", { date, timeRange, focusTime }))
+export function getDashboardTraffic(date?: string, timeRange = "whole-day", focusTime?: string, zoomLevel = 0) {
+  return request<TrafficResponse>(withQuery("/api/dashboard/traffic", {
+    date,
+    timeRange,
+    focusTime,
+    zoomLevel: zoomLevel > 0 ? String(zoomLevel) : undefined,
+  }))
 }
 
 export function getDashboardOcclusion(date?: string, timeRange = "whole-day") {
   return request<OcclusionMapResponse>(withQuery("/api/dashboard/occlusion", { date, timeRange }))
 }
 
-export function getDashboardOcclusionTrends(date?: string, timeRange = "whole-day", focusTime?: string) {
-  return request<OcclusionTrendResponse>(withQuery("/api/dashboard/occlusion-trends", { date, timeRange, focusTime }))
+export function getDashboardOcclusionTrends(date?: string, timeRange = "whole-day", focusTime?: string, zoomLevel = 0) {
+  return request<OcclusionTrendResponse>(withQuery("/api/dashboard/occlusion-trends", {
+    date,
+    timeRange,
+    focusTime,
+    zoomLevel: zoomLevel > 0 ? String(zoomLevel) : undefined,
+  }))
 }
 
 export function getAISynthesis(date: string, timeRange: string) {

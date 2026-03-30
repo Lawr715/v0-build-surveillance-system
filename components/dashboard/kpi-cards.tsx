@@ -13,7 +13,7 @@ export function KPICards({ summary, loading = false }: KPICardsProps) {
     {
       label: "Total Pedestrians",
       value: loading ? "--" : (summary?.totalUniquePedestrians ?? 0).toLocaleString(),
-      hint: "Detections for the selected date",
+      hint: "Unique tracked pedestrians for the selected date",
       icon: Users,
       color: "primary",
     },
