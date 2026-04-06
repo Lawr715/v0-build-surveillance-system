@@ -430,7 +430,7 @@ export function OcclusionMap({ hourFilter, onHourFilterChange, data, loading = f
   const hoverCloseTimeoutRef = useRef<number | null>(null)
   const [mapDimensions, setMapDimensions] = useState<MapDimensions>(DEFAULT_MAP_DIMENSIONS)
   const locations = data?.locations ?? []
-  const availableHours = data?.availableHours ?? []
+  const availableHours = useMemo(() => Array.from(new Set(data?.availableHours ?? [])), [data?.availableHours])
 
   const clearHoverCloseTimeout = () => {
     if (hoverCloseTimeoutRef.current !== null) {

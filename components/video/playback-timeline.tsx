@@ -287,6 +287,7 @@ export function PlaybackTimeline({
       const ratio = index / 4
       const offset = safeDuration * ratio
       return {
+        id: `timeline-marker-${index}-${offset.toFixed(3)}`,
         offset,
         label: (() => {
           const startMinutes = parseClockMinutes(startTime)
@@ -408,7 +409,7 @@ export function PlaybackTimeline({
 
           <div className="mt-3 flex justify-between gap-2 text-[10px] text-muted-foreground">
             {markerOffsets.map((marker) => (
-              <span key={marker.label}>{marker.label}</span>
+              <span key={marker.id}>{marker.label}</span>
             ))}
           </div>
 
