@@ -178,6 +178,18 @@ def preferred_inference_device() -> str:
     return "cpu"
 
 
+def _gpu_needs_half_precision() -> bool:
+    """Check if the CUDA GPU has limited VRAM and needs FP16."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            total_mem_gb = torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
+            return total_mem_gb < 6.0  # Use FP16 for GPUs with less than 6GB
+    except Exception:
+        pass
+    return False
+
+
 def _scalar(value: Any, default: Any = None) -> Any:
     if value is None:
         return default
@@ -625,17 +637,23 @@ def run_video_inference(
     model = YOLO(str(model_path))
     classes, occlusion_classes = _tracking_class_config(getattr(model, "names", None))
 
+    device = preferred_inference_device()
+    use_half = device == "0" and _gpu_needs_half_precision()
+
     track_kwargs = {
         "source": str(video_path),
         "stream": True,
         "persist": True,
         "save": True,
-        "device": preferred_inference_device(),
+        "device": device,
         "project": str(store.PROCESSED_VIDEOS_DIR),
         "name": save_name,
         "exist_ok": True,
         "verbose": False,
     }
+    if use_half:
+        track_kwargs["half"] = True
+        track_kwargs["imgsz"] = 480
     if classes is not None:
         track_kwargs["classes"] = classes
     tracker_config = _tracker_config_path()
@@ -660,7 +678,20 @@ def run_video_inference(
     if progress_callback is not None:
         progress_callback({"progressPercent": 0, "phase": "tracking", "message": "Initializing detection and tracking..."})
 
-    for frame_index, result in enumerate(model.track(**track_kwargs), start=1):
+    try:
+        track_iterator = model.track(**track_kwargs)
+    except RuntimeError as gpu_err:
+        if "CUDA" in str(gpu_err) or "out of memory" in str(gpu_err):
+            print(f"GPU out of memory, falling back to CPU: {gpu_err}")
+            import torch
+            torch.cuda.empty_cache()
+            track_kwargs["device"] = "cpu"
+            track_kwargs.pop("half", None)
+            track_iterator = model.track(**track_kwargs)
+        else:
+            raise
+
+    for frame_index, result in enumerate(track_iterator, start=1):
         boxes = getattr(result, "boxes", None)
         if boxes is None:
             continue
@@ -795,7 +826,7 @@ def run_video_inference(
 
         if total_frames is not None:
             progress_percent = min(78, int(round((frame_index / total_frames) * 78)))
-            if progress_percent >= last_reported_percent + 5 or frame_index >= total_frames:
+            if progress_percent >= last_reported_percent + 1 or frame_index % 100 == 0 or frame_index >= total_frames:
                 last_reported_percent = progress_percent
                 progress_callback(
                     {
@@ -806,8 +837,8 @@ def run_video_inference(
                         "totalFrames": total_frames,
                     }
                 )
-        elif frame_index == 1:
-            progress_callback({"progressPercent": None, "phase": "tracking", "message": "Running detection and tracking..."})
+        elif frame_index == 1 or frame_index % 100 == 0:
+            progress_callback({"progressPercent": None, "phase": "tracking", "message": f"Running detection and tracking (frame {frame_index})..."})
 
     pedestrian_count = len(seen_track_ids) if seen_track_ids else max_people_in_frame
     if pedestrian_count > 0 and not events:
@@ -832,7 +863,23 @@ def run_video_inference(
     if progress_callback is not None:
         progress_callback({"progressPercent": 99, "phase": "finalizing", "message": "Finalizing processed video..."})
 
-    processed_path = _backend_relative_path(_find_processed_video(save_dir, video_path))
+    processed_path_candidate = _find_processed_video(save_dir, video_path)
+    if processed_path_candidate is not None and processed_path_candidate.suffix.lower() == ".avi":
+        try:
+            import imageio_ffmpeg
+            import subprocess
+            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+            mp4_path = processed_path_candidate.with_suffix(".mp4")
+            subprocess.run([
+                ffmpeg_exe, "-y", "-i", str(processed_path_candidate),
+                "-vcodec", "libx264", "-acodec", "aac", str(mp4_path)
+            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            processed_path_candidate.unlink(missing_ok=True)
+            processed_path_candidate = mp4_path
+        except Exception as e:
+            print(f"Failed to convert avi to mp4: {e}")
+
+    processed_path = _backend_relative_path(processed_path_candidate)
     return {
         "pedestrianCount": pedestrian_count,
         "processedPath": processed_path,

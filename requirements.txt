@@ -1,0 +1,21 @@
+# Core web framework
+fastapi[standard]
+python-multipart
+uvicorn[standard]
+
+# AI / ML
+opencv-python
+numpy
+scipy
+matplotlib
+pillow
+psutil
+lapx
+imageio-ffmpeg
+pyyaml
+requests
+
+# Note: PyTorch + torchvision + torchaudio are installed by setup.sh
+# with the correct CUDA version auto-detected from your GPU.
+# The vendored ultralytics in backend/vendor/ultralytics is loaded
+# at runtime (no pip install needed for it).

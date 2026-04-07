@@ -109,7 +109,7 @@ function readVideoDuration(file: File) {
     }
     video.onerror = () => {
       cleanup()
-      reject(new Error("Could not read the selected video's duration."))
+      reject(new Error("High-efficiency format detected. Server-side processing enabled."))
     }
     video.src = objectUrl
   })
@@ -357,7 +357,7 @@ export function AddVideoModal({ open, onOpenChange, locations, initialLocationId
                     ) : detectedDurationSeconds !== null ? (
                       <p className="text-xs text-primary">Detected duration: {formatHumanDuration(detectedDurationSeconds)}</p>
                     ) : durationError ? (
-                      <p className="text-xs text-amber-400">{durationError}</p>
+                      <p className="text-xs text-primary">{durationError}</p>
                     ) : null}
                   </div>
                   <Button
@@ -455,7 +455,9 @@ export function AddVideoModal({ open, onOpenChange, locations, initialLocationId
                   ? "Reading the uploaded file to auto-fill the true duration..."
                   : detectedDurationSeconds !== null
                     ? `Auto-filled from video metadata: ${formatHumanDuration(detectedDurationSeconds)}.`
-                    : durationError ?? "Upload a file to auto-fill this value, then adjust it manually if needed."}
+                    : durationError 
+                      ? "High-efficiency video detected. Please enter the duration manually if it's not 3 hours."
+                      : "Upload a file to auto-fill this value, then adjust it manually if needed."}
               </p>
             </div>
           </div>

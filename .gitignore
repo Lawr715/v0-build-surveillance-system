@@ -28,3 +28,6 @@ backend/storage/videos/processed/*
 !backend/storage/videos/processed/.gitkeep
 backend/storage/exports/*
 !backend/storage/exports/.gitkeep
+*.pt
+alive-engine.tar.gz
+kostka edsawalk_192.168.0.12_KOSTKA @XAVIER_20251006090000_20251006122304_240184.mp4

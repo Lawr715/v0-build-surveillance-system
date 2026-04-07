@@ -362,12 +362,28 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
             return
           }
 
-          const status = await getVideoUploadStatus(upload.uploadId)
-          if (isCancelled) {
-            return
-          }
+          try {
+            const status = await getVideoUploadStatus(upload.uploadId)
+            if (isCancelled) {
+              return
+            }
 
-          updateUpload(upload.id, (current) => applyStatusToUpload(current, status))
+            updateUpload(upload.id, (current) => applyStatusToUpload(current, status))
+          } catch (error) {
+            if (isCancelled) return
+            
+            // If the server returns 404 or fails, the upload session is gone (e.g. server restart)
+            // We transition it to a terminal "cancelled" state to clear the UI "clean slate" style.
+            const endedAt = new Date().toISOString()
+            updateUpload(upload.id, (current) => ({
+              ...current,
+              state: "cancelled",
+              message: "Upload session expired or server restarted.",
+              error: error instanceof Error ? error.message : "Upload session lost.",
+              updatedAt: endedAt,
+              completedAt: endedAt,
+            }))
+          }
         }),
       )
     }

@@ -300,7 +300,14 @@ async def upload_video(
 
     safe_name = safe_filename(file.filename or "video.mp4")
     raw_target = store.RAW_VIDEOS_DIR / f"{uuid4().hex[:8]}-{safe_name}"
-    raw_target.write_bytes(await file.read())
+    # Using chunked streaming for large files to avoid memory pressure
+    try:
+        with open(raw_target, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        if uploadId:
+            store.set_upload_status(uploadId, state="error", progress_percent=None, message=f"Failed to stream video to disk: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to stream video to disk: {str(e)}")
 
     if uploadId:
         store.set_upload_status(uploadId, state="queued", progress_percent=0, message="Upload received. Preparing video for processing...", phase="queued")
